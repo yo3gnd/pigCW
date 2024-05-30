@@ -76,7 +76,7 @@ MORSE_TABLE = {
 class CWDecoder():
     def __init__(self):
         d = self.generate_timings("TEST MAMA ARE MERE")
-        d = self.generate_timings("YO3GND YO8YLX YO3AX")
+        d = self.generate_timings("YO3GND YO8YLX")
         self.analyze_timings(d)
     
     def get_cw(self, char_):

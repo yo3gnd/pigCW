@@ -2,7 +2,11 @@
 import pigpio, json, os, sys, time, queue, threading, signal, configparser
 from datetime import datetime
 from websocket import create_connection, WebSocketTimeoutException
-from cwd import CWDecoder
+
+here = os.path.dirname(os.path.abspath(__file__))
+root = os.path.dirname(here)
+conf_file = os.path.join(root, "pigcw.conf")
+
 pi = pigpio.pi()
 
 RX_DELAY = 1000
@@ -19,7 +23,7 @@ URL+= "?repeater=" + REPEATER
 running = False
 
 class ConfigLoader():
-    def __init__(self, fn="pigcw.conf"):
+    def __init__(self, fn=conf_file):
         self.fn = fn
         self.cp = configparser.ConfigParser()
         self.cp.read(fn)
@@ -270,7 +274,10 @@ def main():
     finally:
         v.stop_rx()
 
-def main2():
-    d = CWDecoder()
+# def main2():
+#     d = CWDecoder()
 
-main2()
+if __name__ == "__main__":
+    main()
+    # if False:
+    #     main2()
