@@ -68,8 +68,8 @@ class PaddleReader():
                     bp = 1
                     # print("dah")
 
-            self.cb_dit = pi.callback(GPIO_DIT, pigpio.EITHER_EDGE, cbf_delegate)
-            self.cb_dah = pi.callback(GPIO_DAH, pigpio.EITHER_EDGE, cbf_delegate)
+            self.cb_dit = pi.callback(self.gpio_dit, pigpio.EITHER_EDGE, cbf_delegate)
+            self.cb_dah = pi.callback(self.gpio_dah, pigpio.EITHER_EDGE, cbf_delegate)
 
             self.start_loop()
 
@@ -129,7 +129,7 @@ class PaddleReader():
 class Buzzer():
     def __init__(self, c, freq):
         self.c = c
-        self.pin = c.get("gpio_buzzer")
+        self.pin = GPIO_BUZZER
         pi.set_mode(self.pin, pigpio.OUTPUT)
         self.change_freq(freq)
 
@@ -155,7 +155,7 @@ class BuzzerTimer():
         self.q = queue.Queue()
         self.ts_offset = round(time.time() * 1000)
         self.run_ = False
-        self.b = Buzzer(c, c.get("rxtone"))
+        self.b = Buzzer(c, RX_TONE)
 
     def start_loop(self):
         threading.Thread(target=self.buzzer_thread).start()
@@ -199,7 +199,7 @@ class VailReader():
         self.offset = 0
         self.cb_ts = (round(time.time() * 1000))
         self.c = c
-        self.url = self.c.get("url") + "?repeater=" + self.c.get("repeater")
+        self.url = URL + "?repeater=" + REPEATER
         print("Connecting to", self.url)
         def on_rx_cb(didah, ts, dur):
             data = {"Timestamp": int(ts) + self.cb_ts + TX_DELAY - self.offset, "Duration":[dur]}
@@ -261,7 +261,16 @@ class VailReader():
 
 def main():
     c = ConfigLoader()
-    global running
+    global running, RX_DELAY, TX_DELAY, RX_TONE, THREAD_SLEEP, GPIO_BUZZER, GPIO_DIT, GPIO_DAH, REPEATER, URL
+    RX_DELAY = c.get("rxdelay")
+    TX_DELAY = c.get("txdelay")
+    RX_TONE = c.get("rxtone")
+    THREAD_SLEEP = c.get("thread_sleep")
+    GPIO_BUZZER = c.get("gpio_buzzer")
+    GPIO_DIT = c.get("gpio_dit")
+    GPIO_DAH = c.get("gpio_dah")
+    REPEATER = c.get("repeater")
+    URL = c.get("url")
     v = VailReader(c)
 
     try:
