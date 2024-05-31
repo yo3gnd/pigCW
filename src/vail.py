@@ -45,7 +45,7 @@ class ConfigLoader():
         else:
             return None
 
-class PaddleReader():
+class KeyReader():
     def __init__(self, c, cb):
 
             self.cb = cb
@@ -80,7 +80,7 @@ class PaddleReader():
 
     def start_loop(self):
         self.run = True
-        threading.Thread(target=self.paddle_thread, daemon=False).start()
+        threading.Thread(target=self.key_thread, daemon=False).start()
         
     def stop_loop(self):
         self.run = False
@@ -89,7 +89,7 @@ class PaddleReader():
        obj = (gpio, not level, tick)
        self.q.put(obj)
 
-    def paddle_thread(self):
+    def key_thread(self):
         dit_start = 0
         dah_start = 0
         ts_offset = pi.get_current_tick()
@@ -213,7 +213,7 @@ class VailReader():
         
         self.ws = create_connection(self.url, subprotocols=["json.vail.woozle.org"], timeout=0.5)
         self.tmr = BuzzerTimer(c)
-        self.pd = PaddleReader(c, on_rx_cb)
+        self.kr = KeyReader(c, on_rx_cb)
         self.tmr.start_loop()
 
     def stop_rx(self):
@@ -221,7 +221,7 @@ class VailReader():
         time.sleep(0.5)
         self.run_vail_rx = False
         self.ws.close()
-        self.pd.stop_loop()
+        self.kr.stop_loop()
 
     def start_rx(self):
         self.run_vail_rx = True
