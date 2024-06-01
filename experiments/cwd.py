@@ -17,61 +17,87 @@ DAH=object()
 LETTER_SPACE=object()
 WORD_SPACE=object()
 
-MORSE_TABLE = {
-    'a': (DIT, DAH),
-    'b': (DAH, DIT, DIT, DIT),
-    'c': (DAH, DIT, DAH, DIT),
-    'd': (DAH, DIT, DIT),
-    'e': (DIT, ),
-    'f': (DIT, DIT, DAH, DIT),
-    'g': (DAH, DAH, DIT),
-    'h': (DIT, DIT, DIT, DIT),
-    'i': (DIT, DIT),
-    'j': (DIT, DAH, DAH, DAH),
-    'k': (DAH, DIT, DAH),
-    'l': (DIT, DAH, DIT, DIT),
-    'm': (DAH, DAH),
-    'n': (DAH, DIT),
-    'o': (DAH, DAH, DAH),
-    'p': (DIT, DAH, DAH, DIT),
-    'q': (DAH, DAH, DIT, DAH),
-    'r': (DIT, DAH, DIT),
-    's': (DIT, DIT, DIT),
-    't': (DAH, ),
-    'u': (DIT, DIT, DAH),
-    'v': (DIT, DIT, DIT, DAH),
-    'w': (DIT, DAH, DAH),
-    'x': (DAH, DIT, DIT, DAH),
-    'y': (DAH, DIT, DAH, DAH),
-    'z': (DAH, DAH, DIT, DIT),
-    '0': (DAH, DAH, DAH, DAH, DAH),
-    '1': (DIT, DAH, DAH, DAH, DAH),
-    '2': (DIT, DIT, DAH, DAH, DAH),
-    '3': (DIT, DIT, DIT, DAH, DAH),
-    '4': (DIT, DIT, DIT, DIT, DAH),
-    '5': (DIT, DIT, DIT, DIT, DIT),
-    '6': (DAH, DIT, DIT, DIT, DIT),
-    '7': (DAH, DAH, DIT, DIT, DIT),
-    '8': (DAH, DAH, DAH, DIT, DIT),
-    '9': (DAH, DAH, DAH, DAH, DIT),
-    '.': (DIT, DAH, DIT, DAH, DIT, DAH),
-    ',': (DAH, DAH, DIT, DIT, DAH, DAH),
-    '/': (DAH, DIT, DIT, DAH, DIT),
-    '?': (DIT, DIT, DAH, DAH, DIT, DIT),
-    '=': (DAH, DIT, DIT, DIT, DAH),
-    "'": (DIT, DAH, DAH, DAH, DAH, DIT),
-    '!': (DAH, DIT, DAH, DIT, DAH, DAH),
-    '(': (DAH, DIT, DAH, DAH, DIT),
-    ')': (DAH, DIT, DAH, DAH, DIT, DAH),
-    '&': (DIT, DAH, DIT, DIT, DIT),
-    ':': (DAH, DAH, DAH, DIT, DIT, DIT),
-    ';': (DAH, DIT, DAH, DIT, DAH, DIT),
-    '+': (DIT, DAH, DIT, DAH, DIT),
-    '-': (DAH, DIT, DIT, DIT, DIT, DAH),
-    '_': (DIT, DIT, DAH, DAH, DIT, DAH),
-    '"': (DIT, DAH, DIT, DIT, DAH, DIT),
-    '$': (DIT, DIT, DIT, DAH, DIT, DIT, DAH),
-}
+CW_INVALID = 0xFF
+
+cw_ascii = ([CW_INVALID] * 32) + [
+    0x01, 0x75, 0x52, 0xFF, 0xFF, 0xFF, 0x22, 0x5E, #  !"#$%&'
+    0x2D, 0x6D, 0xFF, 0x2A, 0x73, 0x61, 0x6A, 0x29, # ()*+,-./
+    0x3F, 0x3E, 0x3C, 0x38, 0x30, 0x20, 0x21, 0x23, # 01234567
+    0x27, 0x2F, 0x47, 0x55, 0xFF, 0x31, 0xFF, 0x4C, # 89:;<=>?
+    0x56, 0x06, 0x11, 0x15, 0x09, 0x02, 0x14, 0x0B, # @ABCDEFG
+    0x10, 0x04, 0x1E, 0x0D, 0x12, 0x07, 0x05, 0x0F, # HIJKLMNO
+    0x16, 0x1B, 0x0A, 0x08, 0x03, 0x0C, 0x18, 0x0E, # PQRSTUVW
+    0x19, 0x1D, 0x13, 0xFF, 0xFF, 0xFF, 0xFF, 0x6C, # XYZ[\\]^_
+    0xFF, 0x06, 0x11, 0x15, 0x09, 0x02, 0x14, 0x0B, # `abcdefg
+    0x10, 0x04, 0x1E, 0x0D, 0x12, 0x07, 0x05, 0x0F, # hijklmno
+    0x16, 0x1B, 0x0A, 0x08, 0x03, 0x0C, 0x18, 0x0E, # pqrstuvw
+    0x19, 0x1D, 0x13, 0xFF, 0xFF, 0xFF, 0xFF,       # xyz{|}~
+]
+
+def cw(c):
+    a = ord(c)
+    if a >= len(cw_ascii):
+        return CW_INVALID
+
+    return cw_ascii[a]
+
+if False:
+    MORSE_TABLE = {
+        'a': (DIT, DAH),
+        'b': (DAH, DIT, DIT, DIT),
+        'c': (DAH, DIT, DAH, DIT),
+        'd': (DAH, DIT, DIT),
+        'e': (DIT, ),
+        'f': (DIT, DIT, DAH, DIT),
+        'g': (DAH, DAH, DIT),
+        'h': (DIT, DIT, DIT, DIT),
+        'i': (DIT, DIT),
+        'j': (DIT, DAH, DAH, DAH),
+
+        'k': (DAH, DIT, DAH),
+        'l': (DIT, DAH, DIT, DIT),
+        'm': (DAH, DAH),
+        'n': (DAH, DIT),
+        'o': (DAH, DAH, DAH),
+        'p': (DIT, DAH, DAH, DIT),
+        'q': (DAH, DAH, DIT, DAH),
+        'r': (DIT, DAH, DIT),
+        's': (DIT, DIT, DIT),
+        't': (DAH, ),
+        'u': (DIT, DIT, DAH),
+        'v': (DIT, DIT, DIT, DAH),
+        'w': (DIT, DAH, DAH),
+        'x': (DAH, DIT, DIT, DAH),
+        'y': (DAH, DIT, DAH, DAH),
+        'z': (DAH, DAH, DIT, DIT),
+        '0': (DAH, DAH, DAH, DAH, DAH),
+        '1': (DIT, DAH, DAH, DAH, DAH),
+        '2': (DIT, DIT, DAH, DAH, DAH),
+        '3': (DIT, DIT, DIT, DAH, DAH),
+        '4': (DIT, DIT, DIT, DIT, DAH),
+        '5': (DIT, DIT, DIT, DIT, DIT),
+        '6': (DAH, DIT, DIT, DIT, DIT),
+        '7': (DAH, DAH, DIT, DIT, DIT),
+        '8': (DAH, DAH, DAH, DIT, DIT),
+        '9': (DAH, DAH, DAH, DAH, DIT),
+        '.': (DIT, DAH, DIT, DAH, DIT, DAH),
+        ',': (DAH, DAH, DIT, DIT, DAH, DAH),
+        '/': (DAH, DIT, DIT, DAH, DIT),
+        '?': (DIT, DIT, DAH, DAH, DIT, DIT),
+        '=': (DAH, DIT, DIT, DIT, DAH),
+        "'": (DIT, DAH, DAH, DAH, DAH, DIT),
+        '!': (DAH, DIT, DAH, DIT, DAH, DAH),
+        '(': (DAH, DIT, DAH, DAH, DIT),
+        ')': (DAH, DIT, DAH, DAH, DIT, DAH),
+        '&': (DIT, DAH, DIT, DIT, DIT),
+        ':': (DAH, DAH, DAH, DIT, DIT, DIT),
+        ';': (DAH, DIT, DAH, DIT, DAH, DIT),
+        '+': (DIT, DAH, DIT, DAH, DIT),
+        '-': (DAH, DIT, DIT, DIT, DIT, DAH),
+        '_': (DIT, DIT, DAH, DAH, DIT, DAH),
+        '"': (DIT, DAH, DIT, DIT, DAH, DIT),
+        '$': (DIT, DIT, DIT, DAH, DIT, DIT, DAH),
+    }
 
 class CWDecoder():
     def __init__(self):
@@ -80,26 +106,35 @@ class CWDecoder():
         self.analyze_timings(d)
     
     def get_cw(self, char_):
-        char_ = char_.lower()
-        return (MORSE_TABLE.get(char_))
+        return cw(char_)
 
     def get_cwr(self, char_):
         d = self.get_cw(char_)
-        for _ in d:
-            print(_)
+        if d == CW_INVALID:
+            return
+        while d > 1:
+            if d & 1:
+                print(DAH)
+            else:
+                print(DIT)
+            d = d >> 1
 
     def get_cw_message(self, msg):
         result = []
         for letter in msg:
-            if letter != ' ':
-                symbol_ = self.get_cw(letter)
-                # print(symbol_)
-                result += symbol_
-                result.append(LETTER_SPACE)
-                for symbol in symbol_:
-                    bp = 1
-            else:
+            d = self.get_cw(letter)
+            if d == CW_INVALID:
+                continue
+            if d == 0x01:
                 result.append(WORD_SPACE)
+                continue
+            while d > 1:
+                if d & 1:
+                    result.append(DAH)
+                else:
+                    result.append(DIT)
+                d = d >> 1
+            result.append(LETTER_SPACE)
         return result
 
     def generate_timings(self, msg):
@@ -150,7 +185,8 @@ class CWDecoder():
         res = cluster(timings_plus, xavg)
         avg1 = round(sum(res[0]) / len(res[0]))
         avg2 = round(sum(res[1]) / len(res[1]))
-        print(res, avg1, avg2)
+        # print(res, avg1, avg2)
+
 
         ms_dit = min(avg1, avg2)
         ms_dah = max(avg1, avg2)
