@@ -12,15 +12,41 @@ pi = pigpio.pi()
 RX_DELAY = 1000
 TX_DELAY = 2000
 RX_TONE = 523
+TX_TONE = 740
 THREAD_SLEEP = 0.01
 GPIO_BUZZER = 27
+GPIO_BUZZER_TX = 27
+GPIO_BUZZER_RX = 22
 GPIO_DIT=26
 GPIO_DAH=16
+GPIO_STRAIGHT=20
+GLITCH_FILTER_STRAIGHT=5000
+REVERSE_PADDLES = 0
+KEYER_MODE = "a"
+STRAIGHT_DISABLE_MS = 1000
+WPM = 20
+DIT_MS = 60
+DAH_MS = 180
+ELEMENT_SPACE_MS = 60
 REPEATER="General"
 URL = "wss://vail.woozle.org/chat"
 URL+= "?repeater=" + REPEATER
 
 running = False
+straight_down = 0
+straight_until = 0
+dit_down = 0
+dah_down = 0
+sending = 0
+sending_end_tick = 0
+space_end_tick = 0
+sending_kind = None
+mem_dit = 0
+mem_dah = 0
+last_repeat = None
+ka_q = []
+tx_begin_ms = 0
+tx_begin_tick = 0
 
 class ConfigLoader():
     def __init__(self, fn=conf_file):
@@ -261,16 +287,32 @@ class VailReader():
 
 def main():
     c = ConfigLoader()
-    global running, RX_DELAY, TX_DELAY, RX_TONE, THREAD_SLEEP, GPIO_BUZZER, GPIO_DIT, GPIO_DAH, REPEATER, URL
+    global running, RX_DELAY, TX_DELAY, RX_TONE, TX_TONE, THREAD_SLEEP
+    global GPIO_BUZZER, GPIO_BUZZER_TX, GPIO_BUZZER_RX, GPIO_DIT, GPIO_DAH, GPIO_STRAIGHT
+    global GLITCH_FILTER_STRAIGHT, REVERSE_PADDLES, KEYER_MODE, STRAIGHT_DISABLE_MS
+    global WPM, DIT_MS, DAH_MS, ELEMENT_SPACE_MS, REPEATER, URL
     RX_DELAY = c.get("rxdelay")
     TX_DELAY = c.get("txdelay")
     RX_TONE = c.get("rxtone")
+    TX_TONE = c.get("txtone")
     THREAD_SLEEP = c.get("thread_sleep")
     GPIO_BUZZER = c.get("gpio_buzzer")
+    GPIO_BUZZER_TX = c.get("gpio_buzzer_tx")
+    GPIO_BUZZER_RX = c.get("gpio_buzzer_rx")
     GPIO_DIT = c.get("gpio_dit")
     GPIO_DAH = c.get("gpio_dah")
+    GPIO_STRAIGHT = c.get("gpio_straight")
+    GLITCH_FILTER_STRAIGHT = c.get("glitch_filter_straight")
+    REVERSE_PADDLES = c.get("reverse_paddles")
+    KEYER_MODE = c.get("keyer_mode")
+    STRAIGHT_DISABLE_MS = c.get("straight_disable_ms")
+    WPM = c.get("wpm")
+    DIT_MS = round(1200 / WPM)
+    DAH_MS = DIT_MS * 3
+    ELEMENT_SPACE_MS = DIT_MS
     REPEATER = c.get("repeater")
     URL = c.get("url")
+    print("cfg", KEYER_MODE, WPM, GPIO_DIT, GPIO_DAH, GPIO_STRAIGHT, GPIO_BUZZER_TX, GPIO_BUZZER_RX, REVERSE_PADDLES)
     v = VailReader(c)
 
     try:
