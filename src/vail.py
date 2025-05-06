@@ -77,25 +77,28 @@ class KeyReader():
             self.cb = cb
             self.c = c
             self.q = queue.Queue()
-            pi.set_pull_up_down(c.get("gpio_dit"), pigpio.PUD_UP)
-            pi.set_glitch_filter(c.get("gpio_dit"), c.get("glitch_filter_dit"))
-            pi.set_pull_up_down(c.get("gpio_dah"), pigpio.PUD_UP)
-            pi.set_glitch_filter(c.get("gpio_dah"), c.get("glitch_filter_dah"))
-
             self.gpio_dit = c.get("gpio_dit")
             self.gpio_dah = c.get("gpio_dah")
+            self.gpio_straight = c.get("gpio_straight")
+            pi.set_pull_up_down(self.gpio_dit, pigpio.PUD_UP)
+            pi.set_glitch_filter(self.gpio_dit, c.get("glitch_filter_dit"))
+            pi.set_pull_up_down(self.gpio_dah, pigpio.PUD_UP)
+            pi.set_glitch_filter(self.gpio_dah, c.get("glitch_filter_dah"))
+            pi.set_pull_up_down(self.gpio_straight, pigpio.PUD_UP)
+            pi.set_glitch_filter(self.gpio_straight, c.get("glitch_filter_straight"))
 
-            def cbf_delegate(gpio, level, tick):
-                self.cbf(gpio, level, tick)
-                if gpio == self.gpio_dit:
-                    bp = 1
-                    # print("dit")
-                elif gpio == self.gpio_dah:
-                    bp = 1
-                    # print("dah")
+            def cbf_dit(gpio, level, tick):
+                self.cbf("dit", level, tick)
 
-            self.cb_dit = pi.callback(self.gpio_dit, pigpio.EITHER_EDGE, cbf_delegate)
-            self.cb_dah = pi.callback(self.gpio_dah, pigpio.EITHER_EDGE, cbf_delegate)
+            def cbf_dah(gpio, level, tick):
+                self.cbf("dah", level, tick)
+
+            def cbf_straight(gpio, level, tick):
+                self.cbf("straight", level, tick)
+
+            self.cb_dit = pi.callback(self.gpio_dit, pigpio.EITHER_EDGE, cbf_dit)
+            self.cb_dah = pi.callback(self.gpio_dah, pigpio.EITHER_EDGE, cbf_dah)
+            self.cb_straight = pi.callback(self.gpio_straight, pigpio.EITHER_EDGE, cbf_straight)
 
             self.start_loop()
 
@@ -103,6 +106,7 @@ class KeyReader():
         pass
         # self.cb_dit.cancel()
         # self.cb_dah.cancel()
+        # self.cb_straight.cancel()
 
     def start_loop(self):
         self.run = True
@@ -111,13 +115,15 @@ class KeyReader():
     def stop_loop(self):
         self.run = False
 
-    def cbf(self, gpio, level, tick):
-       obj = (gpio, not level, tick)
+    def cbf(self, kind, level, tick):
+       obj = (kind, not level, tick)
        self.q.put(obj)
 
     def key_thread(self):
+        global straight_down, straight_until
         dit_start = 0
         dah_start = 0
+        straight_start = 0
         ts_offset = pi.get_current_tick()
         while self.run:
             time.sleep(0.001)
@@ -125,16 +131,43 @@ class KeyReader():
                 nx = self.q.get(block=False)
             except queue.Empty:
                 continue
-            gpio = nx[0]
-            dit = None
+            kind = nx[0]
+            pressed = nx[1]
             gpiotick = nx[2]
-            if gpio == self.gpio_dit:
-                dit = True
-            elif gpio == self.gpio_dah:
-                dit = False
+            now = round(time.time() * 1000)
+            if kind == "straight":
+                if pressed:
+                    straight_down = 1
+                    straight_until = 0
+                    straight_start = gpiotick
+                    print("straight down", gpiotick)
+                else:
+                    straight_down = 0
+                    straight_until = now + STRAIGHT_DISABLE_MS
+                    print("straight up", gpiotick)
+                    print("straight inhibit", straight_until)
+                    straight_start = 0
+                self.q.task_done()
+                continue
 
-            if not nx[1]:
-                if dit:
+            if REVERSE_PADDLES:
+                if kind == "dit":
+                    kind = "dah"
+                else:
+                    kind = "dit"
+
+            if straight_down:
+                print("ignore paddle, straight down")
+                self.q.task_done()
+                continue
+
+            if now < straight_until:
+                print("ignore paddle, inhibit")
+                self.q.task_done()
+                continue
+
+            if not pressed:
+                if kind == "dit":
                     delta = abs(int(pigpio.tickDiff(dit_start, gpiotick)/1000))
                     self.cb(0, round((dit_start - ts_offset)/1000), delta)
                     dit_start = 0
@@ -146,9 +179,11 @@ class KeyReader():
                     self.cb(1, x, delta)
                     dah_start = 0
             else:
-                if dit:
+                if kind == "dit":
+                    print("dit down", gpiotick)
                     dit_start = gpiotick
                 else:
+                    print("dah down", gpiotick)
                     dah_start = gpiotick
             self.q.task_done()
 
