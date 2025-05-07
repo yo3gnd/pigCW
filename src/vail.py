@@ -77,6 +77,7 @@ class KeyReader():
             self.cb = cb
             self.c = c
             self.q = queue.Queue()
+            self.btx = Buzzer(TX_TONE, GPIO_BUZZER_TX)
             self.gpio_dit = c.get("gpio_dit")
             self.gpio_dah = c.get("gpio_dah")
             self.gpio_straight = c.get("gpio_straight")
@@ -120,7 +121,7 @@ class KeyReader():
        self.q.put(obj)
 
     def key_thread(self):
-        global straight_down, straight_until
+        global straight_down, straight_until, dit_down, dah_down
         dit_start = 0
         dah_start = 0
         straight_start = 0
@@ -140,10 +141,13 @@ class KeyReader():
                     straight_down = 1
                     straight_until = 0
                     straight_start = gpiotick
+                    self.btx.change_freq(TX_TONE)
+                    self.btx.buzz(1)
                     print("straight down", gpiotick)
                 else:
                     straight_down = 0
                     straight_until = now + STRAIGHT_DISABLE_MS
+                    self.btx.buzz(0)
                     print("straight up", gpiotick)
                     print("straight inhibit", straight_until)
                     straight_start = 0
@@ -157,58 +161,77 @@ class KeyReader():
                     kind = "dit"
 
             if straight_down:
+                self.btx.buzz(0)
                 print("ignore paddle, straight down")
                 self.q.task_done()
                 continue
 
             if now < straight_until:
+                self.btx.buzz(0)
                 print("ignore paddle, inhibit")
                 self.q.task_done()
                 continue
 
             if not pressed:
                 if kind == "dit":
+                    dit_down = 0
                     delta = abs(int(pigpio.tickDiff(dit_start, gpiotick)/1000))
                     self.cb(0, round((dit_start - ts_offset)/1000), delta)
                     dit_start = 0
                 else:
+                    dah_down = 0
                     delta = abs(int(pigpio.tickDiff(dah_start, gpiotick)/1000))
                     x = round((dah_start - ts_offset)/1000)
                     # print("x=", x, "dah_start=", dah_start)
                     # print(ts_offset)
                     self.cb(1, x, delta)
                     dah_start = 0
+                if dit_down or dah_down:
+                    self.btx.buzz(1)
+                else:
+                    self.btx.buzz(0)
             else:
                 if kind == "dit":
+                    dit_down = 1
                     print("dit down", gpiotick)
                     dit_start = gpiotick
                 else:
+                    dah_down = 1
                     print("dah down", gpiotick)
                     dah_start = gpiotick
+                self.btx.change_freq(TX_TONE)
+                self.btx.buzz(1)
             self.q.task_done()
 
 class Buzzer():
-    def __init__(self, c, freq):
-        self.c = c
-        self.pin = GPIO_BUZZER
+    def __init__(self, freq, pin):
+        self.pin = pin
         pi.set_mode(self.pin, pigpio.OUTPUT)
+        pi.set_PWM_range(self.pin, 100)
         self.change_freq(freq)
 
     def change_freq(self, freq):
         self.freq = int(freq)
-        us = int(1000000 / self.freq / 2)
-        self.wave_buzz = []
-        self.wave_buzz.append(pigpio.pulse(1<<self.pin, 0, us))
-        self.wave_buzz.append(pigpio.pulse(0, 1<<self.pin, us))
-        pi.wave_clear()
-        pi.wave_add_generic(self.wave_buzz) 
-        self.wv = pi.wave_create()
+        pi.set_PWM_frequency(self.pin, self.freq)
+        if False:
+            us = int(1000000 / self.freq / 2)
+            self.wave_buzz = []
+            self.wave_buzz.append(pigpio.pulse(1<<self.pin, 0, us))
+            self.wave_buzz.append(pigpio.pulse(0, 1<<self.pin, us))
+            pi.wave_clear()
+            pi.wave_add_generic(self.wave_buzz) 
+            self.wv = pi.wave_create()
 
     def buzz(self, state):
         if state:
-            cbs = pi.wave_send_repeat(self.wv)
+            pi.set_PWM_dutycycle(self.pin, 50)
         else:
-            pi.wave_tx_stop()
+            pi.set_PWM_dutycycle(self.pin, 0)
+        if False:
+            if state:
+                cbs = pi.wave_send_repeat(self.wv)
+            else:
+                pi.wave_tx_stop()
 
 class BuzzerTimer():
     def __init__(self, c):
@@ -216,7 +239,7 @@ class BuzzerTimer():
         self.q = queue.Queue()
         self.ts_offset = round(time.time() * 1000)
         self.run_ = False
-        self.b = Buzzer(c, RX_TONE)
+        self.b = Buzzer(RX_TONE, GPIO_BUZZER_RX)
 
     def start_loop(self):
         threading.Thread(target=self.buzzer_thread).start()
