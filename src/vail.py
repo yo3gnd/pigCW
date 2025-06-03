@@ -78,6 +78,7 @@ class KeyReader():
             self.c = c
             self.q = queue.Queue()
             self.btx = Buzzer(TX_TONE, GPIO_BUZZER_TX)
+            self.base_ms = round(time.time() * 1000)
             self.gpio_dit = c.get("gpio_dit")
             self.gpio_dah = c.get("gpio_dah")
             self.gpio_straight = c.get("gpio_straight")
@@ -120,88 +121,222 @@ class KeyReader():
        obj = (kind, not level, tick)
        self.q.put(obj)
 
+    def set_mem(self, kind):
+        global mem_dit, mem_dah
+        if KEYER_MODE == "a":
+            s = "mode a mem"
+        elif KEYER_MODE == "b":
+            s = "mode b mem"
+        else:
+            s = "mem"
+        if kind == "dit":
+            if not mem_dit:
+                print(s, "dit")
+            mem_dit = 1
+        else:
+            if not mem_dah:
+                print(s, "dah")
+            mem_dah = 1
+
+    def pop_mem(self):
+        global mem_dit, mem_dah, last_repeat
+        if mem_dit and mem_dah:
+            if last_repeat == "dit":
+                mem_dah = 0
+                return "dah"
+            mem_dit = 0
+            return "dit"
+        if mem_dit:
+            mem_dit = 0
+            return "dit"
+        if mem_dah:
+            mem_dah = 0
+            return "dah"
+        return None
+
+    def clear_tx(self):
+        global sending, sending_end_tick, space_end_tick, sending_kind
+        global mem_dit, mem_dah, last_repeat, ka_q, tx_begin_ms, tx_begin_tick
+        sending = 0
+        sending_end_tick = 0
+        space_end_tick = 0
+        sending_kind = None
+        mem_dit = 0
+        mem_dah = 0
+        last_repeat = None
+        ka_q = []
+        tx_begin_ms = 0
+        tx_begin_tick = 0
+        self.btx.buzz(0)
+
+    def next_kind(self):
+        global dit_down, dah_down, last_repeat
+        x = self.pop_mem()
+        if x:
+            return x
+        if dit_down and dah_down:
+            if last_repeat == "dit":
+                return "dah"
+            if last_repeat == "dah":
+                return "dit"
+            return "dit"
+        if dit_down:
+            return "dit"
+        if dah_down:
+            return "dah"
+        return None
+
+    def begin_tx(self, kind, now, tick):
+        global sending, sending_kind, sending_end_tick, tx_begin_ms, tx_begin_tick
+        global last_repeat, dah_down, dit_down
+        sending = 1
+        sending_kind = kind
+        tx_begin_ms = now
+        tx_begin_tick = tick
+        last_repeat = kind
+        self.btx.change_freq(TX_TONE)
+        self.btx.buzz(1)
+        if kind == "dit":
+            print("tx start dit", tick, DIT_MS)
+            sending_end_tick = now + DIT_MS
+            if KEYER_MODE == "b" and dah_down:
+                self.set_mem("dah")
+        else:
+            print("tx start dah", tick, DAH_MS)
+            sending_end_tick = now + DAH_MS
+            if KEYER_MODE == "b" and dit_down:
+                self.set_mem("dit")
+
+    def end_tx(self, now):
+        global sending, space_end_tick, tx_begin_ms, sending_kind
+        dur = now - tx_begin_ms
+        if dur < 1:
+            dur = 1
+        self.btx.buzz(0)
+        print("tx stop", now)
+        if sending_kind == "dit":
+            self.cb(0, tx_begin_ms - self.base_ms, dur)
+        else:
+            self.cb(1, tx_begin_ms - self.base_ms, dur)
+        tx_begin_ms = 0
+        sending = 2
+        space_end_tick = now + ELEMENT_SPACE_MS
+
+    def handle_deadline(self):
+        global sending, sending_kind, space_end_tick
+        now = round(time.time() * 1000)
+        if straight_down:
+            return
+        if sending == 1 and now >= sending_end_tick:
+            self.end_tx(now)
+            return
+        if sending == 2 and now >= space_end_tick:
+            sending = 0
+            space_end_tick = 0
+            sending_kind = None
+            k = self.next_kind()
+            if k:
+                self.begin_tx(k, now, pi.get_current_tick())
+
+    def event_wait(self):
+        now = round(time.time() * 1000)
+        if sending == 1:
+            x = (sending_end_tick - now) / 1000.0
+            if x < 0:
+                return 0
+            return x
+        if sending == 2:
+            x = (space_end_tick - now) / 1000.0
+            if x < 0:
+                return 0
+            return x
+        return 0.2
+
+    def handle_straight(self, pressed, tick, now):
+        global straight_down, straight_until, dit_down, dah_down, tx_begin_ms
+        if pressed:
+            straight_down = 1
+            straight_until = 0
+            print("straight down", tick)
+            self.clear_tx()
+            dit_down = 0
+            dah_down = 0
+            tx_begin_ms = now
+            self.btx.change_freq(TX_TONE)
+            self.btx.buzz(1)
+        else:
+            print("straight up", tick)
+            if tx_begin_ms:
+                dur = now - tx_begin_ms
+                if dur < 1:
+                    dur = 1
+                self.cb(0, tx_begin_ms - self.base_ms, dur)
+            self.btx.buzz(0)
+            tx_begin_ms = 0
+            straight_down = 0
+            straight_until = now + STRAIGHT_DISABLE_MS
+            print("straight inhibit", straight_until)
+
+    def handle_paddle(self, kind, pressed, tick, now):
+        global dit_down, dah_down
+        if REVERSE_PADDLES:
+            if kind == "dit":
+                kind = "dah"
+            else:
+                kind = "dit"
+
+        if straight_down:
+            print("ignore paddle, straight down")
+            return
+
+        if now < straight_until:
+            print("ignore paddle, inhibit")
+            return
+
+        if kind == "dit":
+            was = dit_down
+            dit_down = 1 if pressed else 0
+        else:
+            was = dah_down
+            dah_down = 1 if pressed else 0
+
+        if pressed:
+            if kind == "dit":
+                print("dit down", tick)
+            else:
+                print("dah down", tick)
+
+            if sending and sending_kind and kind != sending_kind:
+                if KEYER_MODE == "a":
+                    if not was:
+                        self.set_mem(kind)
+                elif KEYER_MODE == "b":
+                    self.set_mem(kind)
+
+            if not sending:
+                k = self.next_kind()
+                if k:
+                    self.begin_tx(k, now, tick)
+
     def key_thread(self):
-        global straight_down, straight_until, dit_down, dah_down
-        dit_start = 0
-        dah_start = 0
-        straight_start = 0
-        ts_offset = pi.get_current_tick()
         while self.run:
-            time.sleep(0.001)
             try:
-                nx = self.q.get(block=False)
+                nx = self.q.get(timeout=self.event_wait())
             except queue.Empty:
+                self.handle_deadline()
                 continue
             kind = nx[0]
             pressed = nx[1]
-            gpiotick = nx[2]
+            tick = nx[2]
             now = round(time.time() * 1000)
             if kind == "straight":
-                if pressed:
-                    straight_down = 1
-                    straight_until = 0
-                    straight_start = gpiotick
-                    self.btx.change_freq(TX_TONE)
-                    self.btx.buzz(1)
-                    print("straight down", gpiotick)
-                else:
-                    straight_down = 0
-                    straight_until = now + STRAIGHT_DISABLE_MS
-                    self.btx.buzz(0)
-                    print("straight up", gpiotick)
-                    print("straight inhibit", straight_until)
-                    straight_start = 0
+                self.handle_straight(pressed, tick, now)
                 self.q.task_done()
+                self.handle_deadline()
                 continue
-
-            if REVERSE_PADDLES:
-                if kind == "dit":
-                    kind = "dah"
-                else:
-                    kind = "dit"
-
-            if straight_down:
-                self.btx.buzz(0)
-                print("ignore paddle, straight down")
-                self.q.task_done()
-                continue
-
-            if now < straight_until:
-                self.btx.buzz(0)
-                print("ignore paddle, inhibit")
-                self.q.task_done()
-                continue
-
-            if not pressed:
-                if kind == "dit":
-                    dit_down = 0
-                    delta = abs(int(pigpio.tickDiff(dit_start, gpiotick)/1000))
-                    self.cb(0, round((dit_start - ts_offset)/1000), delta)
-                    dit_start = 0
-                else:
-                    dah_down = 0
-                    delta = abs(int(pigpio.tickDiff(dah_start, gpiotick)/1000))
-                    x = round((dah_start - ts_offset)/1000)
-                    # print("x=", x, "dah_start=", dah_start)
-                    # print(ts_offset)
-                    self.cb(1, x, delta)
-                    dah_start = 0
-                if dit_down or dah_down:
-                    self.btx.buzz(1)
-                else:
-                    self.btx.buzz(0)
-            else:
-                if kind == "dit":
-                    dit_down = 1
-                    print("dit down", gpiotick)
-                    dit_start = gpiotick
-                else:
-                    dah_down = 1
-                    print("dah down", gpiotick)
-                    dah_start = gpiotick
-                self.btx.change_freq(TX_TONE)
-                self.btx.buzz(1)
+            self.handle_paddle(kind, pressed, tick, now)
             self.q.task_done()
+            self.handle_deadline()
 
 class Buzzer():
     def __init__(self, freq, pin):
