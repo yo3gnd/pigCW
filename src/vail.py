@@ -170,7 +170,21 @@ class KeyReader():
         self.btx.buzz(0)
 
     def next_kind(self):
-        global dit_down, dah_down, last_repeat
+        global dit_down, dah_down, last_repeat, ka_q
+        if KEYER_MODE == "keyahead":
+            if ka_q:
+                x = ka_q.pop(0)
+                print("ka pop", x)
+                return x
+            if dit_down and dah_down:
+                if last_repeat:
+                    return last_repeat
+                return "dit"
+            if dit_down:
+                return "dit"
+            if dah_down:
+                return "dah"
+            return None
         x = self.pop_mem()
         if x:
             return x
@@ -278,7 +292,7 @@ class KeyReader():
             print("straight inhibit", straight_until)
 
     def handle_paddle(self, kind, pressed, tick, now):
-        global dit_down, dah_down
+        global dit_down, dah_down, ka_q
         if REVERSE_PADDLES:
             if kind == "dit":
                 kind = "dah"
@@ -306,7 +320,10 @@ class KeyReader():
             else:
                 print("dah down", tick)
 
-            if sending and sending_kind and kind != sending_kind:
+            if KEYER_MODE == "keyahead":
+                ka_q.append(kind)
+                print("ka push", kind)
+            elif sending and sending_kind and kind != sending_kind:
                 if KEYER_MODE == "a":
                     if not was:
                         self.set_mem(kind)
