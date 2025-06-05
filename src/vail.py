@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import pigpio, json, os, sys, time, queue, threading, signal, configparser
 from datetime import datetime
-from websocket import create_connection, WebSocketTimeoutException
+from websocket import create_connection, WebSocketTimeoutException, WebSocketConnectionClosedException
 
 here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.dirname(here)
@@ -436,27 +436,71 @@ class VailReader():
         self.cb_ts = (round(time.time() * 1000))
         self.c = c
         self.url = URL + "?repeater=" + REPEATER
+        self.ws = None
+        self.ws_lock = threading.Lock()
+        self.backoff = 2
         print("Connecting to", self.url)
         def on_rx_cb(didah, ts, dur):
             data = {"Timestamp": int(ts) + self.cb_ts + TX_DELAY - self.offset, "Duration":[dur]}
             data = json.dumps(data)
+            with self.ws_lock:
+                w = self.ws
+            if not w:
+                print("tx no ws")
+                return
             try:
-                self.ws.send(data)
-            except WebSocketConnectionClosedException:
-                self.run_vail_rx = False
-                print("*** Remote socket closed")
-                v.stop_rx()
+                w.send(data)
+            except WebSocketConnectionClosedException as e:
+                print("tx ws closed", e)
+                self.drop_ws()
+            except Exception as e:
+                print("tx send fail", e)
+                self.drop_ws()
         
-        self.ws = create_connection(self.url, subprotocols=["json.vail.woozle.org"], timeout=0.5)
+        # self.ws = create_connection(self.url, subprotocols=["json.vail.woozle.org"], timeout=0.5)
         self.tmr = BuzzerTimer(c)
         self.kr = KeyReader(c, on_rx_cb)
         self.tmr.start_loop()
+
+    def drop_ws(self):
+        with self.ws_lock:
+            w = self.ws
+            self.ws = None
+        if w:
+            try:
+                w.close()
+            except Exception as e:
+                print("ws close fail", e)
+
+    def connect_ws(self):
+        print("ws connect", self.url)
+        try:
+            w = create_connection(self.url, subprotocols=["json.vail.woozle.org"], timeout=0.5)
+        except Exception as e:
+            print("ws connect fail", e)
+            return False
+        with self.ws_lock:
+            self.ws = w
+        self.backoff = 2
+        print("ws connected")
+        return True
+
+    def backoff_wait(self):
+        x = self.backoff
+        print("ws retry in", x)
+        t0 = time.time()
+        while self.run_vail_rx and (time.time() - t0) < x:
+            time.sleep(0.2)
+        if self.backoff < 64:
+            self.backoff = self.backoff * 2
+            if self.backoff > 64:
+                self.backoff = 64
 
     def stop_rx(self):
         self.tmr.stop_loop()
         time.sleep(0.5)
         self.run_vail_rx = False
-        self.ws.close()
+        self.drop_ws()
         self.kr.stop_loop()
 
     def start_rx(self):
@@ -468,10 +512,31 @@ class VailReader():
         initial_packet = None
         offset = -1
         while self.run_vail_rx:
+            with self.ws_lock:
+                w = self.ws
+            if not w:
+                ok = self.connect_ws()
+                if ok:
+                    initial_packet = None
+                    continue
+                self.backoff_wait()
+                continue
             time.sleep(THREAD_SLEEP)
             try:
-                d = self.ws.recv()
+                d = w.recv()
             except WebSocketTimeoutException:
+                continue
+            except WebSocketConnectionClosedException as e:
+                print("ws recv closed", e)
+                self.drop_ws()
+                initial_packet = None
+                self.backoff_wait()
+                continue
+            except Exception as e:
+                print("ws recv fail", e)
+                self.drop_ws()
+                initial_packet = None
+                self.backoff_wait()
                 continue
             # print(d)
             if not d or d.strip() == "":
