@@ -48,7 +48,7 @@ ka_q = []
 tx_begin_ms = 0
 tx_begin_tick = 0
 
-class ConfigLoader():
+class Cfg():
     def __init__(self, fn=conf_file):
         self.fn = fn
         self.cp = configparser.ConfigParser()
@@ -63,6 +63,7 @@ class ConfigLoader():
             except ValueError:
                 pass
             self.d[k] = val
+        self.load()
 
     def get(self, var):
         if var in self.d:
@@ -71,23 +72,49 @@ class ConfigLoader():
         else:
             return None
 
+    def load(self):
+        self.rx_delay = self.get("rxdelay")
+        self.tx_delay = self.get("txdelay")
+        self.rx_tone = self.get("rxtone")
+        self.tx_tone = self.get("txtone")
+        self.sleep_s = self.get("thread_sleep")
+        self.GPIO_BUZZER = self.get("gpio_buzzer")
+        self.GPIO_BUZZER_TX = self.get("gpio_buzzer_tx")
+        self.GPIO_BUZZER_RX = self.get("gpio_buzzer_rx")
+        self.GPIO_DIT = self.get("gpio_dit")
+        self.GPIO_DAH = self.get("gpio_dah")
+        self.GPIO_STRAIGHT = self.get("gpio_straight")
+        self.glitch_filter_dit = self.get("glitch_filter_dit")
+        self.glitch_filter_dah = self.get("glitch_filter_dah")
+        self.glitch_filter_straight = self.get("glitch_filter_straight")
+        self.reverse = self.get("reverse_paddles")
+        self.mode = self.get("keyer_mode")
+        self.straight_ms = self.get("straight_disable_ms")
+        self.wpm = self.get("wpm")
+        self.url = self.get("url")
+        self.repeater = self.get("repeater")
+        self.ws_url = self.url + "?repeater=" + self.repeater
+        self.dit_ms = round(1200 / self.wpm)
+        self.dah_ms = self.dit_ms * 3
+        self.elem_space = self.dit_ms
+
 class KeyReader():
     def __init__(self, c, cb):
 
             self.cb = cb
             self.c = c
             self.q = queue.Queue()
-            self.btx = Buzzer(TX_TONE, GPIO_BUZZER_TX)
+            self.btx = Buzzer(c.tx_tone, c.GPIO_BUZZER_TX)
             self.base_ms = round(time.time() * 1000)
-            self.gpio_dit = c.get("gpio_dit")
-            self.gpio_dah = c.get("gpio_dah")
-            self.gpio_straight = c.get("gpio_straight")
+            self.gpio_dit = c.GPIO_DIT
+            self.gpio_dah = c.GPIO_DAH
+            self.gpio_straight = c.GPIO_STRAIGHT
             pi.set_pull_up_down(self.gpio_dit, pigpio.PUD_UP)
-            pi.set_glitch_filter(self.gpio_dit, c.get("glitch_filter_dit"))
+            pi.set_glitch_filter(self.gpio_dit, c.glitch_filter_dit)
             pi.set_pull_up_down(self.gpio_dah, pigpio.PUD_UP)
-            pi.set_glitch_filter(self.gpio_dah, c.get("glitch_filter_dah"))
+            pi.set_glitch_filter(self.gpio_dah, c.glitch_filter_dah)
             pi.set_pull_up_down(self.gpio_straight, pigpio.PUD_UP)
-            pi.set_glitch_filter(self.gpio_straight, c.get("glitch_filter_straight"))
+            pi.set_glitch_filter(self.gpio_straight, c.glitch_filter_straight)
 
             def cbf_dit(gpio, level, tick):
                 self.cbf("dit", level, tick)
@@ -123,9 +150,9 @@ class KeyReader():
 
     def set_mem(self, kind):
         global mem_dit, mem_dah
-        if KEYER_MODE == "a":
+        if self.c.mode == "a":
             s = "mode a mem"
-        elif KEYER_MODE == "b":
+        elif self.c.mode == "b":
             s = "mode b mem"
         else:
             s = "mem"
@@ -171,7 +198,7 @@ class KeyReader():
 
     def next_kind(self):
         global dit_down, dah_down, last_repeat, ka_q
-        if KEYER_MODE == "keyahead":
+        if self.c.mode == "keyahead":
             if ka_q:
                 x = ka_q.pop(0)
                 print("ka pop", x)
@@ -208,17 +235,17 @@ class KeyReader():
         tx_begin_ms = now
         tx_begin_tick = tick
         last_repeat = kind
-        self.btx.change_freq(TX_TONE)
+        self.btx.change_freq(self.c.tx_tone)
         self.btx.buzz(1)
         if kind == "dit":
-            print("tx start dit", tick, DIT_MS)
-            sending_end_tick = now + DIT_MS
-            if KEYER_MODE == "b" and dah_down:
+            print("tx start dit", tick, self.c.dit_ms)
+            sending_end_tick = now + self.c.dit_ms
+            if self.c.mode == "b" and dah_down:
                 self.set_mem("dah")
         else:
-            print("tx start dah", tick, DAH_MS)
-            sending_end_tick = now + DAH_MS
-            if KEYER_MODE == "b" and dit_down:
+            print("tx start dah", tick, self.c.dah_ms)
+            sending_end_tick = now + self.c.dah_ms
+            if self.c.mode == "b" and dit_down:
                 self.set_mem("dit")
 
     def end_tx(self, now):
@@ -234,7 +261,7 @@ class KeyReader():
             self.cb(1, tx_begin_ms - self.base_ms, dur)
         tx_begin_ms = 0
         sending = 2
-        space_end_tick = now + ELEMENT_SPACE_MS
+        space_end_tick = now + self.c.elem_space
 
     def handle_deadline(self):
         global sending, sending_kind, space_end_tick
@@ -276,7 +303,7 @@ class KeyReader():
             dit_down = 0
             dah_down = 0
             tx_begin_ms = now
-            self.btx.change_freq(TX_TONE)
+            self.btx.change_freq(self.c.tx_tone)
             self.btx.buzz(1)
         else:
             print("straight up", tick)
@@ -288,12 +315,12 @@ class KeyReader():
             self.btx.buzz(0)
             tx_begin_ms = 0
             straight_down = 0
-            straight_until = now + STRAIGHT_DISABLE_MS
+            straight_until = now + self.c.straight_ms
             print("straight inhibit", straight_until)
 
     def handle_paddle(self, kind, pressed, tick, now):
         global dit_down, dah_down, ka_q
-        if REVERSE_PADDLES:
+        if self.c.reverse:
             if kind == "dit":
                 kind = "dah"
             else:
@@ -320,14 +347,14 @@ class KeyReader():
             else:
                 print("dah down", tick)
 
-            if KEYER_MODE == "keyahead":
+            if self.c.mode == "keyahead":
                 ka_q.append(kind)
                 print("ka push", kind)
             elif sending and sending_kind and kind != sending_kind:
-                if KEYER_MODE == "a":
+                if self.c.mode == "a":
                     if not was:
                         self.set_mem(kind)
-                elif KEYER_MODE == "b":
+                elif self.c.mode == "b":
                     self.set_mem(kind)
 
             if not sending:
@@ -391,7 +418,7 @@ class BuzzerTimer():
         self.q = queue.Queue()
         self.ts_offset = round(time.time() * 1000)
         self.run_ = False
-        self.b = Buzzer(RX_TONE, GPIO_BUZZER_RX)
+        self.b = Buzzer(c.rx_tone, c.GPIO_BUZZER_RX)
 
     def start_loop(self):
         threading.Thread(target=self.buzzer_thread).start()
@@ -402,15 +429,15 @@ class BuzzerTimer():
     def buzzer_thread(self):
         nx = None
         self.run_ = True
-        last_hz = RX_TONE
+        last_hz = self.c.rx_tone
         while self.run_:
-            time.sleep(THREAD_SLEEP)
+            time.sleep(self.c.sleep_s)
             try:
                 nx = self.q.get(block=False)
             except queue.Empty:
                 continue
             while (round(time.time() * 1000 < nx[0])):
-                   time.sleep(THREAD_SLEEP)
+                   time.sleep(self.c.sleep_s)
             # print(self.run_, nx)
             self.q.task_done()
             if nx[1] == -1:
@@ -435,13 +462,13 @@ class VailReader():
         self.offset = 0
         self.cb_ts = (round(time.time() * 1000))
         self.c = c
-        self.url = URL + "?repeater=" + REPEATER
+        self.url = c.ws_url
         self.ws = None
         self.ws_lock = threading.Lock()
         self.backoff = 2
         print("Connecting to", self.url)
         def on_rx_cb(didah, ts, dur):
-            data = {"Timestamp": int(ts) + self.cb_ts + TX_DELAY - self.offset, "Duration":[dur]}
+            data = {"Timestamp": int(ts) + self.cb_ts + self.c.tx_delay - self.offset, "Duration":[dur]}
             data = json.dumps(data)
             with self.ws_lock:
                 w = self.ws
@@ -521,7 +548,7 @@ class VailReader():
                     continue
                 self.backoff_wait()
                 continue
-            time.sleep(THREAD_SLEEP)
+            time.sleep(self.c.sleep_s)
             try:
                 d = w.recv()
             except WebSocketTimeoutException:
@@ -548,46 +575,52 @@ class VailReader():
                 self.offset = (round(time.time() * 1000)) - ts
                 # print("Got timestamp %s, offset=%s" % (ts, self.offset))
             else:
-                rx_delay = RX_DELAY
+                rx_delay = self.c.rx_delay
                 ts_now = rx_delay + int(d['Timestamp']) - self.offset
                 d = d['Duration']
                 if d:
                     if len(d) == 1:
                         duration = int(d[0])
                         f = 740
-                        self.tmr.add_to_queue(ts_now, 1, RX_TONE)
-                        self.tmr.add_to_queue(ts_now + duration, 0, RX_TONE)
+                        self.tmr.add_to_queue(ts_now, 1, self.c.rx_tone)
+                        self.tmr.add_to_queue(ts_now + duration, 0, self.c.rx_tone)
                     else:
                         print("multiple durations not available yet")
 
-def main():
-    c = ConfigLoader()
-    global running, RX_DELAY, TX_DELAY, RX_TONE, TX_TONE, THREAD_SLEEP
-    global GPIO_BUZZER, GPIO_BUZZER_TX, GPIO_BUZZER_RX, GPIO_DIT, GPIO_DAH, GPIO_STRAIGHT
-    global GLITCH_FILTER_STRAIGHT, REVERSE_PADDLES, KEYER_MODE, STRAIGHT_DISABLE_MS
-    global WPM, DIT_MS, DAH_MS, ELEMENT_SPACE_MS, REPEATER, URL
-    RX_DELAY = c.get("rxdelay")
-    TX_DELAY = c.get("txdelay")
-    RX_TONE = c.get("rxtone")
-    TX_TONE = c.get("txtone")
-    THREAD_SLEEP = c.get("thread_sleep")
-    GPIO_BUZZER = c.get("gpio_buzzer")
-    GPIO_BUZZER_TX = c.get("gpio_buzzer_tx")
-    GPIO_BUZZER_RX = c.get("gpio_buzzer_rx")
-    GPIO_DIT = c.get("gpio_dit")
-    GPIO_DAH = c.get("gpio_dah")
-    GPIO_STRAIGHT = c.get("gpio_straight")
-    GLITCH_FILTER_STRAIGHT = c.get("glitch_filter_straight")
-    REVERSE_PADDLES = c.get("reverse_paddles")
-    KEYER_MODE = c.get("keyer_mode")
-    STRAIGHT_DISABLE_MS = c.get("straight_disable_ms")
-    WPM = c.get("wpm")
-    DIT_MS = round(1200 / WPM)
-    DAH_MS = DIT_MS * 3
-    ELEMENT_SPACE_MS = DIT_MS
-    REPEATER = c.get("repeater")
-    URL = c.get("url")
-    print("cfg", KEYER_MODE, WPM, GPIO_DIT, GPIO_DAH, GPIO_STRAIGHT, GPIO_BUZZER_TX, GPIO_BUZZER_RX, REVERSE_PADDLES)
+def main(fn=None):
+    if not fn:
+        if len(sys.argv) > 1:
+            fn = sys.argv[1]
+        else:
+            fn = conf_file
+    c = Cfg(fn)
+    if False:
+        global running, RX_DELAY, TX_DELAY, RX_TONE, TX_TONE, THREAD_SLEEP
+        global GPIO_BUZZER, GPIO_BUZZER_TX, GPIO_BUZZER_RX, GPIO_DIT, GPIO_DAH, GPIO_STRAIGHT
+        global GLITCH_FILTER_STRAIGHT, REVERSE_PADDLES, KEYER_MODE, STRAIGHT_DISABLE_MS
+        global WPM, DIT_MS, DAH_MS, ELEMENT_SPACE_MS, REPEATER, URL
+        RX_DELAY = c.get("rxdelay")
+        TX_DELAY = c.get("txdelay")
+        RX_TONE = c.get("rxtone")
+        TX_TONE = c.get("txtone")
+        THREAD_SLEEP = c.get("thread_sleep")
+        GPIO_BUZZER = c.get("gpio_buzzer")
+        GPIO_BUZZER_TX = c.get("gpio_buzzer_tx")
+        GPIO_BUZZER_RX = c.get("gpio_buzzer_rx")
+        GPIO_DIT = c.get("gpio_dit")
+        GPIO_DAH = c.get("gpio_dah")
+        GPIO_STRAIGHT = c.get("gpio_straight")
+        GLITCH_FILTER_STRAIGHT = c.get("glitch_filter_straight")
+        REVERSE_PADDLES = c.get("reverse_paddles")
+        KEYER_MODE = c.get("keyer_mode")
+        STRAIGHT_DISABLE_MS = c.get("straight_disable_ms")
+        WPM = c.get("wpm")
+        DIT_MS = round(1200 / WPM)
+        DAH_MS = DIT_MS * 3
+        ELEMENT_SPACE_MS = DIT_MS
+        REPEATER = c.get("repeater")
+        URL = c.get("url")
+    print("cfg", c.fn, c.mode, c.wpm, c.GPIO_DIT, c.GPIO_DAH, c.GPIO_STRAIGHT, c.GPIO_BUZZER_TX, c.GPIO_BUZZER_RX, c.reverse)
     v = VailReader(c)
 
     try:
