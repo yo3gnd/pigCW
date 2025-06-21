@@ -32,6 +32,8 @@ class KeyReader():
             self.base_ms = round(time.time() * 1000)
             self.cw_byte = 1
             self.cw_t = 0
+            self.cw_word = ""
+            self.cw_word_t = 0
             self.gpio_dit = c.GPIO_DIT
             self.gpio_dah = c.GPIO_DAH
             self.gpio_straight = c.GPIO_STRAIGHT
@@ -122,6 +124,8 @@ class KeyReader():
         tx_begin_tick = 0
         self.cw_byte = 1
         self.cw_t = 0
+        self.cw_word = ""
+        self.cw_word_t = 0
         self.btx.buzz(0)
 
     def cw_add(self, kind):
@@ -156,10 +160,22 @@ class KeyReader():
             print("cw char", ch)
             self.cw_byte = 1
             self.cw_t = 0
+            self.cw_word += ch
+            self.cw_word_t = round(time.time() * 1000) + (self.c.dit_ms * 4)
             return ch
         print("cw char", "?")
         self.cw_byte = 1
         self.cw_t = 0
+        self.cw_word += "?"
+        self.cw_word_t = round(time.time() * 1000) + (self.c.dit_ms * 4)
+
+    def cw_word_dec(self):
+        if not self.cw_word:
+            self.cw_word_t = 0
+            return
+        print("cw word", self.cw_word)
+        self.cw_word = ""
+        self.cw_word_t = 0
 
     def next_kind(self):
         global dit_down, dah_down, last_repeat, ka_q
@@ -237,6 +253,9 @@ class KeyReader():
         if not sending and self.cw_t and now >= self.cw_t:
             self.cw_dec()
             return
+        if not sending and self.cw_word_t and now >= self.cw_word_t:
+            self.cw_word_dec()
+            return
         if sending == 1 and now >= sending_end_tick:
             self.end_tx(now)
             return
@@ -264,6 +283,11 @@ class KeyReader():
             return x
         if self.cw_t:
             x = (self.cw_t - now) / 1000.0
+            if x < 0:
+                return 0
+            return x
+        if self.cw_word_t:
+            x = (self.cw_word_t - now) / 1000.0
             if x < 0:
                 return 0
             return x
@@ -301,6 +325,11 @@ class KeyReader():
                 self.cw_dec()
             else:
                 self.cw_t = 0
+        if pressed and self.cw_word_t:
+            if now >= self.cw_word_t:
+                self.cw_word_dec()
+            else:
+                self.cw_word_t = 0
         if self.c.reverse:
             if kind == "dit":
                 kind = "dah"
