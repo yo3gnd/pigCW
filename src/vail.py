@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-import pigpio, json, sys, time, queue, threading
+import pigpio, json, os, sys, time, queue, threading
 from websocket import create_connection, WebSocketTimeoutException, WebSocketConnectionClosedException
+from experiments.cwd import cw, CW_INVALID
 from .cfg import Cfg
 
 pi = pigpio.pi()
@@ -29,6 +30,8 @@ class KeyReader():
             self.q = queue.Queue()
             self.btx = Buzzer(c.tx_tone, c.GPIO_BUZZER_TX)
             self.base_ms = round(time.time() * 1000)
+            self.cw_byte = 1
+            self.cw_t = 0
             self.gpio_dit = c.GPIO_DIT
             self.gpio_dah = c.GPIO_DAH
             self.gpio_straight = c.GPIO_STRAIGHT
@@ -117,7 +120,46 @@ class KeyReader():
         ka_q = []
         tx_begin_ms = 0
         tx_begin_tick = 0
+        self.cw_byte = 1
+        self.cw_t = 0
         self.btx.buzz(0)
+
+    def cw_add(self, kind):
+        self.cw_t = 0
+        self.cw_byte = self.cw_byte << 1
+        if kind == "dah":
+            self.cw_byte |= 1
+        print("cw bits", hex(self.cw_byte))
+
+    def cw_cmp(self, ch):
+        d = cw(ch)
+        if d == CW_INVALID:
+            return CW_INVALID
+        x = 1
+        while d > 1:
+            x = x << 1
+            if d & 1:
+                x |= 1
+            d = d >> 1
+        return x
+
+    def cw_dec(self):
+        d = self.cw_byte
+        if d <= 1:
+            return
+        for i in range(32, 127):
+            ch = chr(i)
+            if self.cw_cmp(ch) != d:
+                continue
+            if "A" <= ch <= "Z":
+                ch = ch.lower()
+            print("cw char", ch)
+            self.cw_byte = 1
+            self.cw_t = 0
+            return ch
+        print("cw char", "?")
+        self.cw_byte = 1
+        self.cw_t = 0
 
     def next_kind(self):
         global dit_down, dah_down, last_repeat, ka_q
@@ -158,6 +200,7 @@ class KeyReader():
         tx_begin_ms = now
         tx_begin_tick = tick
         last_repeat = kind
+        self.cw_add(kind)
         self.btx.change_freq(self.c.tx_tone)
         self.btx.buzz(1)
         if kind == "dit":
@@ -191,6 +234,9 @@ class KeyReader():
         now = round(time.time() * 1000)
         if straight_down:
             return
+        if not sending and self.cw_t and now >= self.cw_t:
+            self.cw_dec()
+            return
         if sending == 1 and now >= sending_end_tick:
             self.end_tx(now)
             return
@@ -201,6 +247,8 @@ class KeyReader():
             k = self.next_kind()
             if k:
                 self.begin_tx(k, now, pi.get_current_tick())
+            elif self.cw_byte > 1:
+                self.cw_t = now + (self.c.dit_ms * 2)
 
     def event_wait(self):
         now = round(time.time() * 1000)
@@ -211,6 +259,11 @@ class KeyReader():
             return x
         if sending == 2:
             x = (space_end_tick - now) / 1000.0
+            if x < 0:
+                return 0
+            return x
+        if self.cw_t:
+            x = (self.cw_t - now) / 1000.0
             if x < 0:
                 return 0
             return x
@@ -243,6 +296,11 @@ class KeyReader():
 
     def handle_paddle(self, kind, pressed, tick, now):
         global dit_down, dah_down, ka_q
+        if pressed and self.cw_t:
+            if now >= self.cw_t:
+                self.cw_dec()
+            else:
+                self.cw_t = 0
         if self.c.reverse:
             if kind == "dit":
                 kind = "dah"
