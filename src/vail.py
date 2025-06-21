@@ -26,25 +26,6 @@ from .cfg import Config
 
 gpio = pigpio.pi()
 
-STATE_IDLE = 0
-STATE_TONE = 1
-STATE_SPACE = 2
-
-straight_down = False
-straight_until = 0
-dit_down = False
-dah_down = False
-sending = STATE_IDLE
-sending_end_ms = 0
-space_end_ms = 0
-sending_kind = None
-mem_dit = False
-mem_dah = False
-last_repeat = None
-ka_q = []
-tx_begin_ms = 0
-tx_begin_tick = 0
-
 
 def encode_cw_byte(character):
     table_value = cw(character)
@@ -63,7 +44,8 @@ def encode_cw_byte(character):
     return cw_byte
 
 
-CW_BYTE_TO_CHAR = {}
+# input: cw byte; output: ascii; fast lookup: cw_raw_to_ascii[0x06] -> "a"
+cw_raw_to_ascii = {}
 for ascii_code in range(32, 127):
     text_character = chr(ascii_code)
     cw_byte = encode_cw_byte(text_character)
@@ -71,29 +53,64 @@ for ascii_code in range(32, 127):
         continue
     if "A" <= text_character <= "Z":
         text_character = text_character.lower()
-    CW_BYTE_TO_CHAR[cw_byte] = text_character
+    cw_raw_to_ascii[cw_byte] = text_character
+
+
+class KeyerState:
+    def __init__(self):
+        self.straight_down = False
+        self.straight_until = 0
+
+
+        self.dit_down = False
+        self.dah_down = False
+
+
+        self.sending = "idle"
+        self.sending_end_ms = 0
+        self.space_end_ms = 0
+
+        self.sending_kind = None
+
+        self.mem_dit = False
+        self.mem_dah = False
+
+
+        self.last_repeat = None
+        self.ka_q = []
+
+        self.tx_begin_ms = 0
+
+        self.tx_begin_tick = 0
+
+        self.cw_byte = 1
+        self.cw_t = 0
+
+        self.cw_word = ""
+        self.cw_word_t = 0
 
 
 class Keyer:
     def __init__(self, config, on_element):
         self.config = config
         self.on_element = on_element
+
         self.event_queue = queue.Queue()
         self.tone_output = ToneOutput(config.tx_tone_hz, config.GPIO_BUZZER_TX)
         self.session_start_ms = round(time.time() * 1000)
-        self.cw_byte = 1
-        self.cw_t = 0
-        self.cw_word = ""
-        self.cw_word_t = 0
 
         self.dit_pin = config.GPIO_DIT
         self.dah_pin = config.GPIO_DAH
+
+
         self.straight_pin = config.GPIO_STRAIGHT
 
         gpio.set_pull_up_down(self.dit_pin, pigpio.PUD_UP)
         gpio.set_glitch_filter(self.dit_pin, config.dit_glitch_filter)
+
         gpio.set_pull_up_down(self.dah_pin, pigpio.PUD_UP)
         gpio.set_glitch_filter(self.dah_pin, config.dah_glitch_filter)
+
         gpio.set_pull_up_down(self.straight_pin, pigpio.PUD_UP)
         gpio.set_glitch_filter(self.straight_pin, config.straight_glitch_filter)
 
@@ -115,6 +132,7 @@ class Keyer:
 
         self.running = False
         self.thread = None
+
         self.start()
 
     def start(self):
@@ -125,6 +143,7 @@ class Keyer:
     def stop(self):
         self.running = False
         self.tone_output.set_enabled(False)
+
         self.dit_callback.cancel()
         self.dah_callback.cancel()
         self.straight_callback.cancel()
@@ -158,6 +177,7 @@ class ToneOutput:
         self.pin = pin
         gpio.set_mode(self.pin, pigpio.OUTPUT)
         gpio.set_PWM_range(self.pin, 100)
+
         self.set_frequency(frequency_hz)
 
     def set_frequency(self, frequency_hz):
@@ -175,12 +195,14 @@ class ReceiveTonePlayer:
     def __init__(self, config):
         self.config = config
         self.event_queue = queue.Queue()
+
         self.running = False
         self.tone_output = ToneOutput(config.rx_tone_hz, config.GPIO_BUZZER_RX)
         self.thread = None
 
     def start(self):
         self.thread = threading.Thread(target=self.player_loop)
+
         self.thread.start()
 
     def stop(self):
@@ -190,6 +212,7 @@ class ReceiveTonePlayer:
     def player_loop(self):
         self.running = True
         last_frequency_hz = self.config.rx_tone_hz
+
 
         while self.running:
             time.sleep(self.config.thread_sleep_seconds)
@@ -205,10 +228,12 @@ class ReceiveTonePlayer:
             if not self.running:
                 break
 
+
             if item[1] == 1:
                 if item[2] != last_frequency_hz:
                     self.tone_output.set_frequency(item[2])
                     last_frequency_hz = item[2]
+
                 self.tone_output.set_enabled(True)
             elif item[1] == 0:
                 self.tone_output.set_enabled(False)
@@ -222,16 +247,20 @@ class VailClient:
         self.config = config
         self.socket_running = False
         self.clock_offset_ms = 0
+
         self.session_start_ms = round(time.time() * 1000)
         self.websocket_url = config.websocket_url
         self.socket = None
         self.socket_lock = threading.Lock()
+
+
         self.reconnect_backoff_seconds = 2
 
         print("Connecting to", self.websocket_url)
 
         self.receive_tone_player = ReceiveTonePlayer(config)
         self.keyer = Keyer(config, self.send_transmit_element)
+
         self.receive_tone_player.start()
 
     def send_transmit_element(self, _element_kind, start_offset_ms, duration_ms):
@@ -262,6 +291,7 @@ class VailClient:
             socket = self.socket
             self.socket = None
 
+
         if not socket:
             return
 
@@ -286,6 +316,7 @@ class VailClient:
             self.socket = socket
 
         self.reconnect_backoff_seconds = 2
+
         print("ws connected")
         return True
 
@@ -309,6 +340,7 @@ class VailClient:
     def stop(self):
         self.receive_tone_player.stop()
         time.sleep(0.5)
+
         self.socket_running = False
         self.close_socket()
         self.keyer.stop()
@@ -320,6 +352,7 @@ class VailClient:
         while self.socket_running:
             with self.socket_lock:
                 socket = self.socket
+
 
             if not socket:
                 connected = self.connect_socket()
@@ -360,6 +393,7 @@ class VailClient:
 
             receive_start_ms = self.config.rx_delay_ms + int(packet["Timestamp"]) - self.clock_offset_ms
             durations = packet["Duration"]
+
             if not durations:
                 continue
 
@@ -381,6 +415,7 @@ def main(config_path=None):
     else:
         config = Config()
 
+
     print(
         "cfg",
         config.path,
@@ -395,6 +430,7 @@ def main(config_path=None):
     )
 
     client = VailClient(config)
+
 
     try:
         client.start()
