@@ -1,34 +1,19 @@
 import time
 
-from .cw import CW_INVALID, cw, cw_raw_to_ascii
+from .cw import get_ascii_from_cw_raw, get_cw_from_ascii, cw_raw_to_ascii
 
 
 def encode_cw_byte(character):
-    table_value = cw(character)
-    if table_value == CW_INVALID:
+    try:
+        z = get_cw_from_ascii(character)
+    except ValueError:
         return None
 
-    cw_byte = 1
-    while table_value > 1:
-        cw_byte = cw_byte << 1
-        if table_value & 1:
-            cw_byte |= 1
-        table_value = table_value >> 1
+    cw_byte = (1 << z.len) | z.data
 
     if cw_byte <= 1:
         return None
     return cw_byte
-
-
-cw_raw_to_ascii = {}
-for ascii_code in range(32, 127):
-    text_character = chr(ascii_code)
-    cw_byte = encode_cw_byte(text_character)
-    if cw_byte is None:
-        continue
-    if "A" <= text_character <= "Z":
-        text_character = text_character.lower()
-    cw_raw_to_ascii[cw_byte] = text_character
 
 
 class KeyerState:
@@ -160,8 +145,9 @@ class KeyerEngine:
         if s.cw_byte <= 1:
             return None
 
-        ch = cw_raw_to_ascii.get(s.cw_byte)
-        if ch is None:
+        try:
+            ch = get_ascii_from_cw_raw(s.cw_byte)
+        except ValueError:
             ch = "?"
 
         print("cw char", ch)

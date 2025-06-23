@@ -3,7 +3,7 @@ here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.dirname(here)
 if root not in sys.path:
     sys.path.append(root)
-from src.cw import cw, CW_INVALID
+from src.cw import cw
 
 class CWSign():
     def __init__():
@@ -90,8 +90,9 @@ class CWDecoder():
         return cw(char_)
 
     def get_cwr(self, char_):
-        d = self.get_cw(char_)
-        if d == CW_INVALID:
+        try:
+            d = self.get_cw(char_)
+        except ValueError:
             return
         while d > 1:
             if d & 1:
@@ -103,8 +104,9 @@ class CWDecoder():
     def get_cw_message(self, msg):
         result = []
         for letter in msg:
-            d = self.get_cw(letter)
-            if d == CW_INVALID:
+            try:
+                d = self.get_cw(letter)
+            except ValueError:
                 continue
             if d == 0x01:
                 result.append(WORD_SPACE)
