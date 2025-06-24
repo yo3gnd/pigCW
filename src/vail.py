@@ -1,9 +1,5 @@
 #!/usr/bin/env python
-import json
-import queue
-import sys
-import threading
-import time
+import json, logging, queue, sys, threading, time
 
 import pigpio
 from websocket import (
@@ -17,6 +13,7 @@ from .cfg import Config
 from .keyer_engine import KeyerEngine
 
 
+L = logging.getLogger(__name__)
 gpio = pigpio.pi()
 
 
@@ -187,7 +184,7 @@ class VailClient:
 
         self.reconnect_backoff_seconds = 2
 
-        print("Connecting to", self.websocket_url)
+        L.info("connecting to %s", self.websocket_url)
 
         self.receive_tone_player = ReceiveTonePlayer(config)
         self.keyer = Keyer(config, self.send_transmit_element)
@@ -205,16 +202,16 @@ class VailClient:
             socket = self.socket
 
         if not socket:
-            print("tx no ws")
+            L.warning("tx no ws")
             return
 
         try:
             socket.send(payload)
         except WebSocketConnectionClosedException as error:
-            print("tx ws closed", error)
+            L.warning("tx ws closed %s", error)
             self.close_socket()
         except Exception as error:
-            print("tx send fail", error)
+            L.warning("tx send fail %s", error)
             self.close_socket()
 
     def close_socket(self):
@@ -229,10 +226,10 @@ class VailClient:
         try:
             socket.close()
         except Exception as error:
-            print("ws close fail", error)
+            L.warning("ws close fail %s", error)
 
     def connect_socket(self):
-        print("ws connect", self.websocket_url)
+        L.info("ws connect %s", self.websocket_url)
         try:
             socket = create_connection(
                 self.websocket_url,
@@ -240,7 +237,7 @@ class VailClient:
                 timeout=0.5,
             )
         except Exception as error:
-            print("ws connect fail", error)
+            L.warning("ws connect fail %s", error)
             return False
 
         with self.socket_lock:
@@ -248,12 +245,12 @@ class VailClient:
 
         self.reconnect_backoff_seconds = 2
 
-        print("ws connected")
+        L.info("ws connected")
         return True
 
     def wait_before_reconnect(self):
         wait_seconds = self.reconnect_backoff_seconds
-        print("ws retry in", wait_seconds)
+        L.info("ws retry in %s", wait_seconds)
 
         started_at = time.time()
         while self.socket_running and (time.time() - started_at) < wait_seconds:
@@ -300,13 +297,13 @@ class VailClient:
             except WebSocketTimeoutException:
                 continue
             except WebSocketConnectionClosedException as error:
-                print("ws recv closed", error)
+                L.warning("ws recv closed %s", error)
                 self.close_socket()
                 first_packet = None
                 self.wait_before_reconnect()
                 continue
             except Exception as error:
-                print("ws recv fail", error)
+                L.warning("ws recv fail %s", error)
                 self.close_socket()
                 first_packet = None
                 self.wait_before_reconnect()
@@ -329,7 +326,7 @@ class VailClient:
                 continue
 
             if len(durations) != 1:
-                print("multiple durations not available yet")
+                L.warning("multiple durations not available yet")
                 continue
 
             duration_ms = int(durations[0])
@@ -347,8 +344,8 @@ def main(config_path=None):
         config = Config()
 
 
-    print(
-        "cfg",
+    L.info(
+        "cfg %s %s %s %s %s %s %s %s %s",
         config.path,
         config.keyer_mode,
         config.words_per_minute,
@@ -364,6 +361,7 @@ def main(config_path=None):
 
 
     try:
+        print("Starting...")
         client.start()
         while True:
             time.sleep(0.1)
@@ -374,4 +372,5 @@ def main(config_path=None):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()

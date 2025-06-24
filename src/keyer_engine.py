@@ -1,6 +1,9 @@
-import time
+import logging, time
 
 from .cw import get_ascii_from_cw_raw, get_cw_from_ascii, cw_raw_to_ascii
+
+
+L = logging.getLogger(__name__)
 
 
 def encode_cw_byte(character):
@@ -72,13 +75,13 @@ class KeyerEngine:
 
         if kind == "dit":
             if not s.mem_dit:
-                print(label, "dit")
+                L.debug("%s dit", label)
 
             s.mem_dit = True
             return
 
         if not s.mem_dah:
-            print(label, "dah")
+            L.debug("%s dah", label)
 
         s.mem_dah = True
 
@@ -137,7 +140,7 @@ class KeyerEngine:
         if kind == "dah":
             s.cw_byte |= 1
 
-        print("cw bits", hex(s.cw_byte))
+        L.debug("cw bits %s", hex(s.cw_byte))
 
     def cw_dec(self):
         s = self.s
@@ -150,7 +153,7 @@ class KeyerEngine:
         except ValueError:
             ch = "?"
 
-        print("cw char", ch)
+        L.debug("cw char %s", ch)
         s.cw_byte = 1
 
         s.cw_t = 0
@@ -166,7 +169,7 @@ class KeyerEngine:
             s.cw_word_t = 0
             return
 
-        print("cw word", s.cw_word)
+        L.debug("cw word %s", s.cw_word)
         s.cw_word = ""
         s.cw_word_t = 0
 
@@ -176,7 +179,7 @@ class KeyerEngine:
         if self.c.keyer_mode == "keyahead":
             if s.ka_q:
                 kind = s.ka_q.pop(0)
-                print("ka pop", kind)
+                L.debug("ka pop %s", kind)
                 return kind
 
             if s.dit_down and s.dah_down:
@@ -225,13 +228,13 @@ class KeyerEngine:
         self.out.set_enabled(True)
 
         if kind == "dit":
-            print("tx start dit", gpio_tick, self.c.dit_ms)
+            L.debug("tx start dit %s %s", gpio_tick, self.c.dit_ms)
             s.sending_end_ms = now_ms + self.c.dit_ms
             if self.c.keyer_mode == "b" and s.dah_down:
                 self.set_mem("dah")
             return
 
-        print("tx start dah", gpio_tick, self.c.dah_ms)
+        L.debug("tx start dah %s %s", gpio_tick, self.c.dah_ms)
         s.sending_end_ms = now_ms + self.c.dah_ms
         if self.c.keyer_mode == "b" and s.dit_down:
             self.set_mem("dit")
@@ -244,7 +247,7 @@ class KeyerEngine:
             dur_ms = 1
 
         self.out.set_enabled(False)
-        print("tx stop", s.tx_begin_tick, now_ms)
+        L.debug("tx stop %s %s", s.tx_begin_tick, now_ms)
 
         if s.sending_kind == "dit":
             self.cb(0, s.tx_begin_ms - self.base_ms, dur_ms)
@@ -324,7 +327,7 @@ class KeyerEngine:
         if pressed:
             s.straight_down = True
             s.straight_until = 0
-            print("straight down", gpio_tick)
+            L.debug("straight down %s", gpio_tick)
 
             self.clear_tx()
             s.straight_down = True
@@ -338,7 +341,7 @@ class KeyerEngine:
             self.out.set_enabled(True)
             return
 
-        print("straight up", gpio_tick)
+        L.debug("straight up %s", gpio_tick)
 
         if s.tx_begin_ms:
             dur_ms = now_ms - s.tx_begin_ms
@@ -352,7 +355,7 @@ class KeyerEngine:
 
         s.straight_down = False
         s.straight_until = now_ms + self.c.straight_disable_ms
-        print("straight inhibit", s.straight_until)
+        L.debug("straight inhibit %s", s.straight_until)
 
     def paddle_ev(self, kind, pressed, gpio_tick, now_ms):
         s = self.s
@@ -376,11 +379,11 @@ class KeyerEngine:
                 kind = "dit"
 
         if s.straight_down:
-            print("ignore paddle, straight down")
+            L.debug("ignore paddle, straight down")
             return
 
         if now_ms < s.straight_until:
-            print("ignore paddle, inhibit")
+            L.debug("ignore paddle, inhibit")
             return
 
         if kind == "dit":
@@ -395,13 +398,13 @@ class KeyerEngine:
             return
 
         if kind == "dit":
-            print("dit down", gpio_tick)
+            L.debug("dit down %s", gpio_tick)
         else:
-            print("dah down", gpio_tick)
+            L.debug("dah down %s", gpio_tick)
 
         if self.c.keyer_mode == "keyahead":
             s.ka_q.append(kind)
-            print("ka push", kind)
+            L.debug("ka push %s", kind)
         elif s.sending and s.sending_kind and kind != s.sending_kind:
             if self.c.keyer_mode == "a":
                 if not was:

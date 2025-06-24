@@ -2,7 +2,7 @@ import logging
 from collections import namedtuple
 
 
-logger = logging.getLogger(__name__)
+L = logging.getLogger(__name__)
 
 
 CW_INVALID = 0xFF
@@ -86,7 +86,7 @@ def _build_cw_raw(data, length):
 def get_cw_from_ascii(char):
     raw = _lookup_cw_raw(char)
     bits = _split_cw_raw(raw)
-    logger.debug("cw ascii %r -> raw %#x -> %s", char, raw, bits)
+    L.debug("cw ascii %r -> raw %#x -> %s", char, raw, bits)
     return bits
 
 def get_ascii_from_cw_raw(raw):
@@ -95,7 +95,7 @@ def get_ascii_from_cw_raw(raw):
     char = cw_raw_to_ascii.get(raw)
     if char is None: raise ValueError()
 
-    logger.debug("cw raw %#x -> ascii %r", raw, char)
+    L.debug("cw raw %#x -> ascii %r", raw, char)
     return char
 
 def get_ascii_from_cw(data, length):
