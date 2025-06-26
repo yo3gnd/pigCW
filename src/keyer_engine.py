@@ -1,6 +1,7 @@
 import logging, time
 
 from .cw import get_ascii_from_cw_raw, get_cw_from_ascii, cw_raw_to_ascii
+from .utils import mono_clock_ms
 
 
 L = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class KeyerEngine:
         self.cb = cb
         self.gpio = gpio
 
-        self.base_ms = round(time.time() * 1000)
+        self.base_ms = mono_clock_ms()
         self.s = KeyerState()
 
     def set_mem(self, kind):
@@ -158,7 +159,7 @@ class KeyerEngine:
 
         s.cw_t = 0
         s.cw_word += ch
-        s.cw_word_t = round(time.time() * 1000) + (self.c.dit_ms * 4)
+        s.cw_word_t = mono_clock_ms() + (self.c.dit_ms * 4)
 
         return ch
 
@@ -262,7 +263,7 @@ class KeyerEngine:
 
     def timer_ev(self):
         s = self.s
-        now_ms = round(time.time() * 1000)
+        now_ms = mono_clock_ms()
 
         if s.straight_down:
             return
@@ -293,7 +294,7 @@ class KeyerEngine:
 
     def wait_s(self):
         s = self.s
-        now_ms = round(time.time() * 1000)
+        now_ms = mono_clock_ms()
 
         if s.sending == "tone":
             x = (s.sending_end_ms - now_ms) / 1000.0

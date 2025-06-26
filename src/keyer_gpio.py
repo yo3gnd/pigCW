@@ -3,6 +3,7 @@ import logging, queue, threading, time
 import pigpio
 
 from .keyer_engine import KeyerEngine
+from .utils import mono_clock_ms
 
 
 L = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class KeyerGPIO:
 
         self.event_queue = queue.Queue()
         self.tone_output = ToneOutput(config.tx_tone_hz, config.GPIO_BUZZER_TX)
-        self.session_start_ms = round(time.time() * 1000)
+        self.session_start_ms = mono_clock_ms()
         self.eng = KeyerEngine(config, self.tone_output, on_element, gpio)
 
         self.dit_pin = config.GPIO_DIT
@@ -98,7 +99,7 @@ class KeyerGPIO:
                 self.eng.timer_ev()
                 continue
 
-            now_ms = round(time.time() * 1000)
+            now_ms = mono_clock_ms()
 
             if kind == "straight":
                 self.eng.straight_ev(pressed, gpio_tick, now_ms)

@@ -9,6 +9,7 @@ from websocket import (
 
 from .cfg import Config
 from .keyer_gpio import KeyerGPIO, ToneOutput
+from .utils import mono_clock_ms, wall_clock_ms
 
 
 L = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ class ReceiveTonePlayer:
             except queue.Empty:
                 continue
 
-            while self.running and round(time.time() * 1000) < item[0]:
+            while self.running and wall_clock_ms() < item[0]:
                 time.sleep(self.config.thread_sleep_seconds)
 
             self.event_queue.task_done()
@@ -71,7 +72,7 @@ class VailClient:
         self.socket_running = False
         self.clock_offset_ms = 0
 
-        self.session_start_ms = round(time.time() * 1000)
+        self.session_start_ms = wall_clock_ms()
         self.websocket_url = config.websocket_url
         self.socket = None
         self.socket_lock = threading.Lock()
@@ -147,8 +148,8 @@ class VailClient:
         wait_seconds = self.reconnect_backoff_seconds
         L.info("ws retry in %s", wait_seconds)
 
-        started_at = time.time()
-        while self.socket_running and (time.time() - started_at) < wait_seconds:
+        started_at = mono_clock_ms()
+        while self.socket_running and (mono_clock_ms() - started_at) < (wait_seconds * 1000):
             time.sleep(0.2)
 
         if self.reconnect_backoff_seconds < 64:
@@ -211,7 +212,7 @@ class VailClient:
             if not first_packet:
                 first_packet = packet
                 timestamp_ms = int(packet["Timestamp"])
-                self.clock_offset_ms = round(time.time() * 1000) - timestamp_ms
+                self.clock_offset_ms = wall_clock_ms() - timestamp_ms
                 continue
 
             receive_start_ms = self.config.rx_delay_ms + int(packet["Timestamp"]) - self.clock_offset_ms
