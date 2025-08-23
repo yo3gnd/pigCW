@@ -8,25 +8,60 @@ from .utils import mono_clock_ms
 
 L = logging.getLogger(__name__)
 gpio = pigpio.pi()
+wave_lock = threading.Lock()
+wave_pin = None
 
 
 class ToneOutput:
     def __init__(self, frequency_hz, pin):
         self.pin = pin
         gpio.set_mode(self.pin, pigpio.OUTPUT)
-        gpio.set_PWM_range(self.pin, 100)
+        self.frequency_hz = int(frequency_hz)
+        self.wv = None
+        self.on = False
 
-        self.set_frequency(frequency_hz)
+        if False:
+            gpio.set_PWM_range(self.pin, 100)
+            self.set_frequency(frequency_hz)
 
     def set_frequency(self, frequency_hz):
         self.frequency_hz = int(frequency_hz)
-        gpio.set_PWM_frequency(self.pin, self.frequency_hz)
+
+        if False:
+            gpio.set_PWM_frequency(self.pin, self.frequency_hz)
+
+    def _mk_wave(self):
+        us = int(1000000 / self.frequency_hz / 2)
+        w = []
+        w.append(pigpio.pulse(1 << self.pin, 0, us))
+        w.append(pigpio.pulse(0, 1 << self.pin, us))
+
+        gpio.wave_clear()
+        gpio.wave_add_generic(w)
+        self.wv = gpio.wave_create()
 
     def set_enabled(self, enabled):
+        global wave_pin
+
         if enabled:
-            gpio.set_PWM_dutycycle(self.pin, 50)
+            with wave_lock:
+                self._mk_wave()
+                gpio.wave_send_repeat(self.wv)
+                wave_pin = self.pin
+                self.on = True
+
+            if False:
+                gpio.set_PWM_dutycycle(self.pin, 50)
         else:
-            gpio.set_PWM_dutycycle(self.pin, 0)
+            with wave_lock:
+                self.on = False
+                if wave_pin == self.pin:
+                    gpio.wave_tx_stop()
+                    gpio.write(self.pin, 0)
+                    wave_pin = None
+
+            if False:
+                gpio.set_PWM_dutycycle(self.pin, 0)
 
 
 class KeyerGPIO:
