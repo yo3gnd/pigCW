@@ -209,7 +209,7 @@ class VailClient:
                 continue
 
             packet = json.loads(payload)
-            if not first_packet:
+            if first_packet is None:
                 first_packet = packet
                 timestamp_ms = int(packet["Timestamp"])
                 self.clock_offset_ms = wall_clock_ms() - timestamp_ms
