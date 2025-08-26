@@ -8,7 +8,7 @@ from websocket import (
 )
 
 from .cfg import Config
-from .keyer_gpio import KeyerGPIO, ToneOutput
+from .keyer_gpio import KeyerGPIO, ToneMixerXor, ToneOutput
 from .utils import mono_clock_ms, wall_clock_ms
 
 
@@ -267,6 +267,39 @@ def main(config_path=None):
         client.stop()
 
 
+def main3(config_path=None):
+    if config_path is None and len(sys.argv) > 1:
+        config_path = sys.argv[1]
+
+    if config_path:
+        c = Config(config_path)
+    else:
+        c = Config()
+
+    print("Starting...")
+    print("xor mix test on BCM", c.GPIO_BUZZER_RX)
+
+    x = ToneMixerXor(c.tx_tone_hz, c.rx_tone_hz, c.GPIO_BUZZER_RX)
+
+    try:
+        while True:
+            x.set(0, 0)
+            time.sleep(1)
+
+            x.set(1, 0)
+            time.sleep(1)
+
+            x.set(1, 1)
+            time.sleep(1)
+
+            x.set(0, 1)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("*** Exiting")
+    finally:
+        x.stop()
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    main()
+    main3()

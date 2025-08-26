@@ -1,4 +1,4 @@
-import logging, queue, threading, time
+import logging, math, queue, threading, time
 
 import pigpio
 
@@ -62,6 +62,97 @@ class ToneOutput:
 
             if False:
                 gpio.set_PWM_dutycycle(self.pin, 0)
+
+
+class ToneMixerXor:
+    def __init__(self, a, b, pin):
+        self.pin = pin
+        self.a = int(a)
+        self.b = int(b)
+        self.x = self.mk1(self.a)
+        self.y = self.mkx(self.a, self.b)
+        self.z = self.mk1(self.b)
+
+        gpio.set_mode(self.pin, pigpio.OUTPUT)
+
+    def mk1(self, hz):
+        u = int(1000000 / hz / 2)
+        w = []
+        w.append(pigpio.pulse(1 << self.pin, 0, u))
+        w.append(pigpio.pulse(0, 1 << self.pin, u))
+
+        gpio.wave_add_new()
+        gpio.wave_add_generic(w)
+        return gpio.wave_create()
+
+    def mkx(self, a, b):
+        ua = int(1000000 / a / 2)
+        ub = int(1000000 / b / 2)
+        r = (2 * ua * 2 * ub) // math.gcd(2 * ua, 2 * ub)
+
+        sa = 1
+        sb = 1
+        so = sa ^ sb
+
+        t = 0
+        ta = ua
+        tb = ub
+        w = []
+
+        while t < r:
+            n = min(ta, tb)
+            d = n - t
+
+            if d > 0:
+                if so:
+                    w.append(pigpio.pulse(1 << self.pin, 0, d))
+                else:
+                    w.append(pigpio.pulse(0, 1 << self.pin, d))
+
+            t = n
+
+            if ta == n:
+                sa ^= 1
+                ta += ua
+
+            if tb == n:
+                sb ^= 1
+                tb += ub
+
+            so = sa ^ sb
+
+        gpio.wave_add_new()
+        gpio.wave_add_generic(w)
+        return gpio.wave_create()
+
+    def set(self, a, b):
+        with wave_lock:
+            if a and b:
+                gpio.wave_send_repeat(self.y)
+                return
+
+            if a:
+                gpio.wave_send_repeat(self.x)
+                return
+
+            if b:
+                gpio.wave_send_repeat(self.z)
+                return
+
+            gpio.wave_tx_stop()
+            gpio.write(self.pin, 0)
+
+    def stop(self):
+        with wave_lock:
+            gpio.wave_tx_stop()
+            gpio.write(self.pin, 0)
+
+        if self.x >= 0:
+            gpio.wave_delete(self.x)
+        if self.y >= 0:
+            gpio.wave_delete(self.y)
+        if self.z >= 0:
+            gpio.wave_delete(self.z)
 
 
 class KeyerGPIO:
