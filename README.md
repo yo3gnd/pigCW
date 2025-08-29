@@ -27,12 +27,11 @@ Vail is bloody good for CW group practice sessions, because it sets up a low-lat
 
 The following pins are used for I/O.
 - pin 38 (BCM GPIO 20): straight key input
-- pin 13 (BCM GPIO 27): tx buzzer
-- pin 15 (BCM GPIO 22): rx buzzer
+- pin 15 (BCM GPIO 22): buzzer, mixed rx/tx audio
 - pin 37 (BCM GPIO26): paddle dit
 - pin 36 (BCM GPIO16): paddle dah
 
-For now you will need two buzzers, or a resistive bodge into one if you do not mind it sounding a bit rough.
+Audio is a raw square xor mix of tx and rx frequencies. It works, though not beautifully.
 
 ## Running
 

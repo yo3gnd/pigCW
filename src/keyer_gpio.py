@@ -9,71 +9,40 @@ from .utils import mono_clock_ms
 L = logging.getLogger(__name__)
 gpio = pigpio.pi()
 wave_lock = threading.Lock()
-wave_pin = None
 
 
-class ToneOutput:
-    def __init__(self, frequency_hz, pin):
-        self.pin = pin
-        gpio.set_mode(self.pin, pigpio.OUTPUT)
-        self.frequency_hz = int(frequency_hz)
-        self.wv = None
-        self.on = False
+class ToneMix:
+    def __init__(self, m, k):
+        self.m = m
+        self.k = k
 
-        if False:
-            gpio.set_PWM_range(self.pin, 100)
-            self.set_frequency(frequency_hz)
-
-    def set_frequency(self, frequency_hz):
-        self.frequency_hz = int(frequency_hz)
-
-        if False:
-            gpio.set_PWM_frequency(self.pin, self.frequency_hz)
-
-    def _mk_wave(self):
-        us = int(1000000 / self.frequency_hz / 2)
-        w = []
-        w.append(pigpio.pulse(1 << self.pin, 0, us))
-        w.append(pigpio.pulse(0, 1 << self.pin, us))
-
-        gpio.wave_clear()
-        gpio.wave_add_generic(w)
-        self.wv = gpio.wave_create()
-
-    def set_enabled(self, enabled):
-        global wave_pin
-
-        if enabled:
-            with wave_lock:
-                self._mk_wave()
-                gpio.wave_send_repeat(self.wv)
-                wave_pin = self.pin
-                self.on = True
-
-            if False:
-                gpio.set_PWM_dutycycle(self.pin, 50)
+    def set_frequency(self, hz):
+        if self.k == "tx":
+            self.m.set_tx_hz(hz)
         else:
-            with wave_lock:
-                self.on = False
-                if wave_pin == self.pin:
-                    gpio.wave_tx_stop()
-                    gpio.write(self.pin, 0)
-                    wave_pin = None
+            self.m.set_rx_hz(hz)
 
-            if False:
-                gpio.set_PWM_dutycycle(self.pin, 0)
+    def set_enabled(self, on):
+        if self.k == "tx":
+            self.m.set_tx(on)
+        else:
+            self.m.set_rx(on)
 
 
 class ToneMixerXor:
-    def __init__(self, a, b, pin):
+    def __init__(self, pin, tx_hz, rx_hz):
         self.pin = pin
-        self.a = int(a)
-        self.b = int(b)
-        self.x = self.mk1(self.a)
-        self.y = self.mkx(self.a, self.b)
-        self.z = self.mk1(self.b)
-
         gpio.set_mode(self.pin, pigpio.OUTPUT)
+        self.tx_hz = int(tx_hz)
+        self.rx_hz = int(rx_hz)
+        self.tx_on = 0
+        self.rx_on = 0
+        self.x = -1
+        self.y = -1
+        self.z = -1
+        self.rebuild()
+        self.tx = ToneMix(self, "tx")
+        self.rx = ToneMix(self, "rx")
 
     def mk1(self, hz):
         u = int(1000000 / hz / 2)
@@ -125,25 +94,70 @@ class ToneMixerXor:
         gpio.wave_add_generic(w)
         return gpio.wave_create()
 
-    def set(self, a, b):
+    def rebuild(self):
+        a = self.x
+        b = self.y
+        c = self.z
+
+        self.x = self.mk1(self.tx_hz)
+        self.y = self.mkx(self.tx_hz, self.rx_hz)
+        self.z = self.mk1(self.rx_hz)
+
+        if a >= 0:
+            gpio.wave_delete(a)
+        if b >= 0:
+            gpio.wave_delete(b)
+        if c >= 0:
+            gpio.wave_delete(c)
+
+    def set_tx_hz(self, hz):
+        hz = int(hz)
+        if hz == self.tx_hz:
+            return
         with wave_lock:
-            if a and b:
-                gpio.wave_send_repeat(self.y)
-                return
+            self.tx_hz = hz
+            self.rebuild()
+            self.apply()
 
-            if a:
-                gpio.wave_send_repeat(self.x)
-                return
+    def set_rx_hz(self, hz):
+        hz = int(hz)
+        if hz == self.rx_hz:
+            return
+        with wave_lock:
+            self.rx_hz = hz
+            self.rebuild()
+            self.apply()
 
-            if b:
-                gpio.wave_send_repeat(self.z)
-                return
+    def set_tx(self, on):
+        with wave_lock:
+            self.tx_on = 1 if on else 0
+            self.apply()
 
-            gpio.wave_tx_stop()
-            gpio.write(self.pin, 0)
+    def set_rx(self, on):
+        with wave_lock:
+            self.rx_on = 1 if on else 0
+            self.apply()
+
+    def apply(self):
+        if self.tx_on and self.rx_on:
+            gpio.wave_send_repeat(self.y)
+            return
+
+        if self.tx_on:
+            gpio.wave_send_repeat(self.x)
+            return
+
+        if self.rx_on:
+            gpio.wave_send_repeat(self.z)
+            return
+
+        gpio.wave_tx_stop()
+        gpio.write(self.pin, 0)
 
     def stop(self):
         with wave_lock:
+            self.tx_on = 0
+            self.rx_on = 0
             gpio.wave_tx_stop()
             gpio.write(self.pin, 0)
 
@@ -156,12 +170,12 @@ class ToneMixerXor:
 
 
 class KeyerGPIO:
-    def __init__(self, config, on_element):
+    def __init__(self, config, on_element, mix):
         self.config = config
         self.on_element = on_element
 
         self.event_queue = queue.Queue()
-        self.tone_output = ToneOutput(config.tx_tone_hz, config.GPIO_BUZZER_TX)
+        self.tone_output = mix.tx
         self.session_start_ms = mono_clock_ms()
         self.eng = KeyerEngine(config, self.tone_output, on_element, gpio)
 

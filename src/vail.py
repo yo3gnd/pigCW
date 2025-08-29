@@ -8,7 +8,7 @@ from websocket import (
 )
 
 from .cfg import Config
-from .keyer_gpio import KeyerGPIO, ToneMixerXor, ToneOutput
+from .keyer_gpio import KeyerGPIO, ToneMixerXor
 from .utils import mono_clock_ms, wall_clock_ms
 
 
@@ -16,12 +16,12 @@ L = logging.getLogger(__name__)
 
 
 class ReceiveTonePlayer:
-    def __init__(self, config):
+    def __init__(self, config, mix):
         self.config = config
         self.event_queue = queue.Queue()
 
         self.running = False
-        self.tone_output = ToneOutput(config.rx_tone_hz, config.GPIO_BUZZER_RX)
+        self.tone_output = mix.rx
         self.thread = None
 
     def start(self):
@@ -82,8 +82,9 @@ class VailClient:
 
         L.info("connecting to %s", self.websocket_url)
 
-        self.receive_tone_player = ReceiveTonePlayer(config)
-        self.keyer = KeyerGPIO(config, self.send_transmit_element)
+        self.mix = ToneMixerXor(config.GPIO_BUZZER_RX, config.tx_tone_hz, config.rx_tone_hz)
+        self.receive_tone_player = ReceiveTonePlayer(config, self.mix)
+        self.keyer = KeyerGPIO(config, self.send_transmit_element, self.mix)
 
         self.receive_tone_player.start()
 
@@ -168,6 +169,7 @@ class VailClient:
         self.socket_running = False
         self.close_socket()
         self.keyer.stop()
+        self.mix.stop()
 
     def socket_loop(self):
         self.socket_running = True
@@ -265,41 +267,6 @@ def main(config_path=None):
         print("*** Exiting")
     finally:
         client.stop()
-
-
-def main3(config_path=None):
-    if config_path is None and len(sys.argv) > 1:
-        config_path = sys.argv[1]
-
-    if config_path:
-        c = Config(config_path)
-    else:
-        c = Config()
-
-    print("Starting...")
-    print("xor mix test on BCM", c.GPIO_BUZZER_RX)
-
-    x = ToneMixerXor(c.tx_tone_hz, c.rx_tone_hz, c.GPIO_BUZZER_RX)
-
-    try:
-        while True:
-            x.set(0, 0)
-            time.sleep(1)
-
-            x.set(1, 0)
-            time.sleep(1)
-
-            x.set(1, 1)
-            time.sleep(1)
-
-            x.set(0, 1)
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("*** Exiting")
-    finally:
-        x.stop()
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    main3()
+    main()
