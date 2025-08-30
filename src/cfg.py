@@ -43,7 +43,6 @@ class Config:
 
         self.thread_sleep_seconds = self.get("thread_sleep")
 
-        self.GPIO_BUZZER = self.get("gpio_buzzer")
         self.GPIO_BUZZER_TX = self.get("gpio_buzzer_tx")
 
         self.GPIO_BUZZER_RX = self.get("gpio_buzzer_rx")

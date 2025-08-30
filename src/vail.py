@@ -8,7 +8,7 @@ from websocket import (
 )
 
 from .cfg import Config
-from .keyer_gpio import KeyerGPIO, ToneOutput
+from .keyer_gpio import KeyerGPIO, ToneMixerXor
 from .utils import mono_clock_ms, wall_clock_ms
 
 
@@ -16,12 +16,12 @@ L = logging.getLogger(__name__)
 
 
 class ReceiveTonePlayer:
-    def __init__(self, config):
+    def __init__(self, config, mix):
         self.config = config
         self.event_queue = queue.Queue()
 
         self.running = False
-        self.tone_output = ToneOutput(config.rx_tone_hz, config.GPIO_BUZZER_RX)
+        self.tone_output = mix.rx
         self.thread = None
 
     def start(self):
@@ -82,8 +82,9 @@ class VailClient:
 
         L.info("connecting to %s", self.websocket_url)
 
-        self.receive_tone_player = ReceiveTonePlayer(config)
-        self.keyer = KeyerGPIO(config, self.send_transmit_element)
+        self.mix = ToneMixerXor(config.GPIO_BUZZER_RX, config.tx_tone_hz, config.rx_tone_hz)
+        self.receive_tone_player = ReceiveTonePlayer(config, self.mix)
+        self.keyer = KeyerGPIO(config, self.send_transmit_element, self.mix)
 
         self.receive_tone_player.start()
 
@@ -168,6 +169,7 @@ class VailClient:
         self.socket_running = False
         self.close_socket()
         self.keyer.stop()
+        self.mix.stop()
 
     def socket_loop(self):
         self.socket_running = True
@@ -209,7 +211,7 @@ class VailClient:
                 continue
 
             packet = json.loads(payload)
-            if not first_packet:
+            if first_packet is None:
                 first_packet = packet
                 timestamp_ms = int(packet["Timestamp"])
                 self.clock_offset_ms = wall_clock_ms() - timestamp_ms
@@ -265,8 +267,6 @@ def main(config_path=None):
         print("*** Exiting")
     finally:
         client.stop()
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     main()
