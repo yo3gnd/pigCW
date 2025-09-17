@@ -60,6 +60,8 @@ class AudioToneMix:
         self.tx = AudioSide(self, "tx")
         self.rx = AudioSide(self, "rx")
 
+        self.start()
+
     def set_tx_hz(self, hz):
         self.tx_hz = int(hz)
 
@@ -109,7 +111,58 @@ class AudioToneMix:
             self.status_n += 1
             self.status_s = str(st)
 
+        tx_p = self.tx_p
+        rx_p = self.rx_p
+        tx_g = self.tx_g
+        rx_g = self.rx_g
+
+        tx_k = self.pi2 * self.tx_hz / self.c.audio_samplerate
+        rx_k = self.pi2 * self.rx_hz / self.c.audio_samplerate
+
+        tx_t = 1.0 if self.tx_on else 0.0
+        rx_t = 1.0 if self.rx_on else 0.0
+
         out = np.zeros(frames, dtype="float32")
+
+        for i in range(frames):
+            if tx_g < tx_t:
+                tx_g += self.fade_k
+                if tx_g > tx_t:
+                    tx_g = tx_t
+            elif tx_g > tx_t:
+                tx_g -= self.fade_k
+                if tx_g < tx_t:
+                    tx_g = tx_t
+
+            if rx_g < rx_t:
+                rx_g += self.fade_k
+                if rx_g > rx_t:
+                    rx_g = rx_t
+            elif rx_g > rx_t:
+                rx_g -= self.fade_k
+                if rx_g < rx_t:
+                    rx_g = rx_t
+
+            y = 0.0
+
+            if tx_g > 0.0:
+                y += math.sin(tx_p) * tx_g * a_tx
+                tx_p += tx_k
+                if tx_p >= self.pi2:
+                    tx_p -= self.pi2
+
+            if rx_g > 0.0:
+                y += math.sin(rx_p) * rx_g * a_rx
+                rx_p += rx_k
+                if rx_p >= self.pi2:
+                    rx_p -= self.pi2
+
+            out[i] = y
+
+        self.tx_p = tx_p
+        self.rx_p = rx_p
+        self.tx_g = tx_g
+        self.rx_g = rx_g
 
         outdata[:, 0] = out
 
