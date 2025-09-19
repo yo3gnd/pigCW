@@ -63,15 +63,19 @@ class AudioToneMix:
         self.start()
 
     def set_tx_hz(self, hz):
+        self.log_status()
         self.tx_hz = int(hz)
 
     def set_rx_hz(self, hz):
+        self.log_status()
         self.rx_hz = int(hz)
 
     def set_tx(self, on):
+        self.log_status()
         self.tx_on = 1 if on else 0
 
     def set_rx(self, on):
+        self.log_status()
         self.rx_on = 1 if on else 0
 
     def start(self):
@@ -175,6 +179,8 @@ class AudioToneMix:
         self.status_s = ""
 
     def stop(self):
+        self.log_status()
+
         if not self.stream:
             return
 
