@@ -95,7 +95,7 @@ class AudioToneMix:
             channels=1,
             dtype="float32",
             latency=self.c.audio_latency,
-            blocksize=0,
+            blocksize=896,
             device=d,
             callback=self.cb,
         )
@@ -126,42 +126,43 @@ class AudioToneMix:
         tx_t = 1.0 if self.tx_on else 0.0
         rx_t = 1.0 if self.rx_on else 0.0
 
+        x = np.arange(frames, dtype="float32")
+        r = x + 1.0
         out = np.zeros(frames, dtype="float32")
 
-        for i in range(frames):
-            if tx_g < tx_t:
-                tx_g += self.fade_k
-                if tx_g > tx_t:
-                    tx_g = tx_t
-            elif tx_g > tx_t:
-                tx_g -= self.fade_k
-                if tx_g < tx_t:
-                    tx_g = tx_t
+        if tx_g == tx_t:
+            tx_v = tx_g
+            tx_g = tx_v
+        elif tx_g < tx_t:
+            tx_v = tx_g + (self.fade_k * r)
+            tx_v = np.minimum(tx_v, tx_t)
+            tx_g = float(tx_v[-1])
+        else:
+            tx_v = tx_g - (self.fade_k * r)
+            tx_v = np.maximum(tx_v, tx_t)
+            tx_g = float(tx_v[-1])
 
-            if rx_g < rx_t:
-                rx_g += self.fade_k
-                if rx_g > rx_t:
-                    rx_g = rx_t
-            elif rx_g > rx_t:
-                rx_g -= self.fade_k
-                if rx_g < rx_t:
-                    rx_g = rx_t
+        if rx_g == rx_t:
+            rx_v = rx_g
+            rx_g = rx_v
+        elif rx_g < rx_t:
+            rx_v = rx_g + (self.fade_k * r)
+            rx_v = np.minimum(rx_v, rx_t)
+            rx_g = float(rx_v[-1])
+        else:
+            rx_v = rx_g - (self.fade_k * r)
+            rx_v = np.maximum(rx_v, rx_t)
+            rx_g = float(rx_v[-1])
 
-            y = 0.0
+        if tx_g > 0.0 or tx_t > 0.0:
+            p = tx_p + (tx_k * x)
+            out += np.sin(p) * tx_v * a_tx
+            tx_p = (tx_p + (tx_k * frames)) % self.pi2
 
-            if tx_g > 0.0:
-                y += math.sin(tx_p) * tx_g * a_tx
-                tx_p += tx_k
-                if tx_p >= self.pi2:
-                    tx_p -= self.pi2
-
-            if rx_g > 0.0:
-                y += math.sin(rx_p) * rx_g * a_rx
-                rx_p += rx_k
-                if rx_p >= self.pi2:
-                    rx_p -= self.pi2
-
-            out[i] = y
+        if rx_g > 0.0 or rx_t > 0.0:
+            p = rx_p + (rx_k * x)
+            out += np.sin(p) * rx_v * a_rx
+            rx_p = (rx_p + (rx_k * frames)) % self.pi2
 
         self.tx_p = tx_p
         self.rx_p = rx_p
