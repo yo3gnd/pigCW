@@ -9,7 +9,7 @@ from websocket import (
 
 from .audio_out import AudioToneMix
 from .cfg import Config
-from .keyer_gpio import KeyerGPIO, ToneMixerXor
+from .keyer_gpio import KeyerGPIO
 from .utils import mono_clock_ms, wall_clock_ms
 
 
@@ -84,11 +84,6 @@ class VailClient:
         L.info("connecting to %s", self.websocket_url)
 
         self.aud = AudioToneMix(config)
-
-        if False:
-            self.mix = ToneMixerXor(config.GPIO_BUZZER_RX, config.tx_tone_hz, config.rx_tone_hz)
-            self.receive_tone_player = ReceiveTonePlayer(config, self.mix)
-            self.keyer = KeyerGPIO(config, self.send_transmit_element, self.mix)
 
         self.receive_tone_player = ReceiveTonePlayer(config, self.aud)
         self.keyer = KeyerGPIO(config, self.send_transmit_element, self.aud)
@@ -176,10 +171,6 @@ class VailClient:
         self.socket_running = False
         self.close_socket()
         self.keyer.stop()
-
-        if False:
-            self.mix.stop()
-
         self.aud.stop()
 
     def socket_loop(self):

@@ -21,17 +21,17 @@ Vail is bloody good for CW group practice sessions, because it sets up a low-lat
 
 ## Installation
 
-`apt-get install pigpio-tools python3-pigpio`
+`apt-get install pigpio-tools python3-pigpio python3-numpy libportaudio2 portaudio19-dev python3-pip`
+
+`python3 -m pip install --break-system-packages sounddevice`
 
 ## Wiring
 
-The following pins are used for I/O.
+The following pins are used for I/O, and the headphone jack is used for audio.
 - pin 38 (BCM GPIO 20): straight key input
-- pin 15 (BCM GPIO 22): buzzer, mixed rx/tx audio
 - pin 37 (BCM GPIO26): paddle dit
 - pin 36 (BCM GPIO16): paddle dah
-
-Audio is a raw square xor mix of tx and rx frequencies. It works, though not beautifully.
+- audio jack: audio out, rx and sidetone
 
 ## Running
 
