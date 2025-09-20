@@ -68,6 +68,12 @@ class Config:
         self.repeater = self.get("repeater")
         self.websocket_url = self.url + "?repeater=" + self.repeater
 
+        self.audio_enable = self.get("audio_enable")
+        self.audio_samplerate = self.get("audio_samplerate")
+        self.audio_latency = self.get("audio_latency")
+        self.audio_fade_ms = self.get("audio_fade_ms")
+        self.audio_device = self.get("audio_device")
+
         self.dit_ms = round(1200 / self.words_per_minute)
 
         self.dah_ms = self.dit_ms * 3

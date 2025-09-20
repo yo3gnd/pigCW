@@ -19,20 +19,42 @@ Vail suits this sort of thing unusually well because:
 
 Vail is bloody good for CW group practice sessions, because it sets up a low-latency link that still feels conversational while preserving the other operator's fist. If not, you can use [vail zoomer](https://github.com/Vail-CW/vail-zoomer) which injects audio directly into zoom.
 
+
 ## Installation
 
-`apt-get install pigpio-tools python3-pigpio`
+`apt-get install pigpio-tools python3-pigpio python3-numpy libportaudio2 portaudio19-dev python3-pip`
+
+`python3 -m pip install --break-system-packages sounddevice`
+
+You will need pigpiod for this. Once you have it installed, this should return 0
+
+`pigs r 25	# read pin 25`
+
+if it returns `socket connect failed` instead, pigpiod is not running.
+
+
+Since pigpiod is no longer available under Trixie, run this to build it:
+```
+sudo apt install -y python3-setuptools python3-full
+wget https://github.com/joan2937/pigpio/archive/refs/tags/v79.tar.gz
+tar zxf v79.tar.gz
+cd pigpio-79
+make
+
+sudo make install
+sudo ldconfig
+sudo systemctl daemon-reload
+```
 
 ## Wiring
 
-The following pins are used for I/O.
+The following pins are used for I/O, and the headphone jack is used for audio.
 - pin 38 (BCM GPIO 20): straight key input
-- pin 15 (BCM GPIO 22): buzzer, mixed rx/tx audio
 - pin 37 (BCM GPIO26): paddle dit
 - pin 36 (BCM GPIO16): paddle dah
+- ~~pin 15 (BCM GPIO 22): buzzer, mixed rx/tx audio~~
+- audio jack: audio out, rx and sidetone
 
-Audio is a raw square xor mix of tx and rx frequencies. It works, though not beautifully.
-
-## Running
+## Running 
 
 Run as `python -m src.vail`.
