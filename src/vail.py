@@ -212,7 +212,12 @@ class VailClient:
             if not payload or payload.strip() == "":
                 continue
 
-            packet = json.loads(payload)
+            try:
+                packet = json.loads(payload)
+            except Exception as error:
+                L.warning("ws json fail %s", error)
+                continue
+
             if first_packet is None:
                 first_packet = packet
                 timestamp_ms = int(packet["Timestamp"])
