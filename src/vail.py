@@ -230,13 +230,21 @@ class VailClient:
             if not durations:
                 continue
 
-            if len(durations) != 1:
-                L.warning("multiple durations not available yet")
-                continue
+            t = receive_start_ms
+            tx = 1
 
-            duration_ms = int(durations[0])
-            self.receive_tone_player.enqueue(receive_start_ms, 1, self.config.rx_tone_hz)
-            self.receive_tone_player.enqueue(receive_start_ms + duration_ms, 0, self.config.rx_tone_hz)
+            for d in durations:
+                d = int(d)
+
+                if d < 0:
+                    continue
+
+                if tx and d > 0:
+                    self.receive_tone_player.enqueue(t, 1, self.config.rx_tone_hz)
+                    self.receive_tone_player.enqueue(t + d, 0, self.config.rx_tone_hz)
+
+                t += d
+                tx = not tx
 
 
 def main(config_path=None):
