@@ -40,9 +40,8 @@ class ReceiveTonePlayer:
 
 
         while self.running:
-            time.sleep(self.config.thread_sleep_seconds)
             try:
-                item = self.event_queue.get(block=False)
+                item = self.event_queue.get(timeout=self.config.thread_sleep_seconds)
             except queue.Empty:
                 continue
 
