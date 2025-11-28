@@ -1,7 +1,7 @@
 # pigCW
 
 Still experimental. This is a terminal-only client to [Vail](https://vail.woozle.net), for practicing Morse code over the internet.
-Connect your key and a buzzer to the Pi and it becomes a rather direct little Vail terminal - the moment someone sends something on Vail, you will hear it and you can reply directly from your key.
+Connect a straight key or a paddle to the Pi's GPIo and a speaker on its audio output. It becomes a rather direct little Vail terminal - the moment someone sends something on Vail, you will hear it and you can reply directly from your key. It also generates the sidetone on the very same speaker, with care taken for a real-time response.
 Based on an idea by [YO3AX](https://github.com/YO3AX): "I'm thinking of a batphone like device, but for CW, directly connected to Vail. It just beeps at you when someone sends and patiently waits for your reply"
 
 The name pigCW is a bad pun between ham and pigpio - the main IO library - often misread as "pig pio".
@@ -49,11 +49,13 @@ sudo systemctl daemon-reload
 ## Wiring
 
 The following pins are used for I/O, and the headphone jack is used for audio.
-- pin 38 (BCM GPIO 20): straight key input
-- pin 37 (BCM GPIO26): paddle dit
+- pin 22 (BCM GPIO 25): straight key input
+- pin 38 (BCM GPIO20): paddle dit
 - pin 36 (BCM GPIO16): paddle dah
 - ~~pin 15 (BCM GPIO 22): buzzer, mixed rx/tx audio~~
-- audio jack: audio out, rx and sidetone
+- audio jack: Audio out: both the receiver and your sidetone
+
+<img src="docs/pinout.webp" height="480">
 
 ## Running 
 
