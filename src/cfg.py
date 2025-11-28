@@ -6,6 +6,46 @@ ROOT = os.path.dirname(HERE)
 DEFAULT_CONFIG_PATH = os.path.join(ROOT, "pigcw.conf")
 
 
+PIN_BOARD_TO_BCM = {
+    3: 2,
+    5: 3,
+    7: 4,
+    8: 14,
+    10: 15,
+    11: 17,
+    12: 18,
+    13: 27,
+    15: 22,
+    16: 23,
+    18: 24,
+    19: 10,
+    21: 9,
+    22: 25,
+    23: 11,
+    24: 8,
+    26: 7,
+    27: 0,
+    28: 1,
+    29: 5,
+    31: 6,
+    32: 12,
+    33: 13,
+    35: 19,
+    36: 16,
+    37: 26,
+    38: 20,
+    40: 21,
+}
+
+
+def pin_bcm(n):
+    if n is None: raise ValueError()
+    n = int(n)
+    if n not in PIN_BOARD_TO_BCM: raise ValueError()
+
+    return PIN_BOARD_TO_BCM[n]
+
+
 class Config:
     def __init__(self, path=DEFAULT_CONFIG_PATH):
         self.path = path
@@ -43,14 +83,11 @@ class Config:
 
         self.thread_sleep_seconds = self.get("thread_sleep")
 
-        self.GPIO_BUZZER_TX = self.get("gpio_buzzer_tx")
-
-        self.GPIO_BUZZER_RX = self.get("gpio_buzzer_rx")
-        self.GPIO_DIT = self.get("gpio_dit")
-        self.GPIO_DAH = self.get("gpio_dah")
+        self.GPIO_DIT = pin_bcm(self.get("gpio_dit"))
+        self.GPIO_DAH = pin_bcm(self.get("gpio_dah"))
 
 
-        self.GPIO_STRAIGHT = self.get("gpio_straight")
+        self.GPIO_STRAIGHT = pin_bcm(self.get("gpio_straight"))
 
         self.dit_glitch_filter = self.get("glitch_filter_dit")
         self.dah_glitch_filter = self.get("glitch_filter_dah")

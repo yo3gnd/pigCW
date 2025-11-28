@@ -257,15 +257,13 @@ def main(config_path=None):
 
 
     L.info(
-        "cfg %s %s %s %s %s %s %s %s %s",
+        "cfg %s %s %s %s %s %s %s",
         config.path,
         config.keyer_mode,
         config.words_per_minute,
         config.GPIO_DIT,
         config.GPIO_DAH,
         config.GPIO_STRAIGHT,
-        config.GPIO_BUZZER_TX,
-        config.GPIO_BUZZER_RX,
         config.reverse_paddles,
     )
 
