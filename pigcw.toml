@@ -1,0 +1,72 @@
+[general]
+rxdelay = 1000
+txdelay = 500
+rxtone = 523
+txtone = 740
+thread_sleep = 0.01
+gpio_buzzer_tx = 27
+gpio_buzzer_rx = 22
+gpio_dit = 26
+gpio_dah = 16
+gpio_straight = 20
+glitch_filter_dit = 5000
+glitch_filter_dah = 5000
+glitch_filter_straight = 5000
+reverse_paddles = 0
+keyer_mode = "a"
+straight_disable_ms = 1000
+wpm = 20
+url = "wss://vail.woozle.org/chat"
+repeater = "General"
+audio_enable = 1
+audio_samplerate = 48000
+audio_latency = "low"
+audio_fade_ms = 4
+audio_device = "default"
+
+[alerts]
+enable = false
+print = true
+source = "rx"
+min_marks = 24
+min_window_s = 10
+max_window_s = 20
+ratio_min = 2.5
+ratio_max = 3.5
+short_share_min = 0.25
+short_share_max = 0.75
+long_share_min = 0.25
+long_share_max = 0.75
+cluster_cv_max = 0.18
+cooldown_s = 300
+
+[alerts.script]
+enable = false
+path = ""
+args = []
+timeout_s = 5
+
+[alerts.mqtt]
+enable = false
+host = "127.0.0.1"
+port = 1883
+client_id = "pigcw"
+topic = "pigcw/activity"
+payload = "{\"event\":\"cw_activity\",\"source\":\"{source}\",\"ts_ms\":{ts_ms},\"window_ms\":{window_ms},\"marks\":{marks},\"short_marks\":{short_marks},\"long_marks\":{long_marks},\"short_ms\":{short_ms},\"long_ms\":{long_ms},\"ratio\":{ratio}}"
+username = ""
+password = ""
+keepalive_s = 30
+qos = 0
+retain = false
+reconnect_min_s = 2
+reconnect_max_s = 64
+tls = false
+
+[alerts.http]
+enable = false
+method = "GET"
+url = ""
+payload = "{\"event\":\"cw_activity\",\"source\":\"{source}\",\"ts_ms\":{ts_ms},\"window_ms\":{window_ms},\"marks\":{marks},\"short_marks\":{short_marks},\"long_marks\":{long_marks},\"short_ms\":{short_ms},\"long_ms\":{long_ms},\"ratio\":{ratio}}"
+timeout_s = 5
+content_type = "application/json"
+verify_tls = true
