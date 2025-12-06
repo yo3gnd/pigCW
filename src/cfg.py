@@ -1,32 +1,19 @@
-import configparser, os
+import os, tomllib
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-DEFAULT_CONFIG_PATH = os.path.join(ROOT, "pigcw.conf")
+DEFAULT_CONFIG_PATH = os.path.join(ROOT, "pigcw.toml")
 
 
 class Config:
     def __init__(self, path=DEFAULT_CONFIG_PATH):
         self.path = path
 
-        self.parser = configparser.ConfigParser()
-        self.parser.read(path)
+        with open(path, "rb") as f:
+            self.data = tomllib.load(f)
 
-        self.values = dict(self.parser.items("general"))
-
-        for key, value in list(self.values.items()):
-            try:
-                number = float(value)
-
-                if number.is_integer():
-                    number = int(number)
-
-                value = number
-            except ValueError:
-                pass
-
-            self.values[key] = value
+        self.values = dict(self.data.get("general", {}))
 
         self.load()
 
