@@ -58,3 +58,12 @@ The following pins are used for I/O, and the headphone jack is used for audio.
 ## Running 
 
 Run as `python -m src.vail`.
+
+It reads `pigcw.toml` from the repo root by default.
+
+The new alert knobs live in:
+
+- `[alerts]`
+- `[alerts.script]`
+- `[alerts.mqtt]`
+- `[alerts.http]`
