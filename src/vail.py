@@ -235,6 +235,7 @@ class VailClient:
             receive_start_ms = self.config.rx_delay_ms + int(packet["Timestamp"]) - self.clock_offset_ms
             durations = packet["Duration"]
             self.rx_mark_tap(receive_start_ms, durations)
+            self.alerts.run(receive_start_ms)
 
             if not durations:
                 continue

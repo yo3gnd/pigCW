@@ -36,8 +36,22 @@ class AlertDet:
         while self.items and now_ms - self.items[0][0] > self.max_window_ms:
             self.items.pop(0)
 
+    def win_ms(self):
+        if len(self.items) < 2:
+            return 0
+
+        return self.items[-1][0] - self.items[0][0]
+
     def run(self, now_ms):
         self.trim(now_ms)
+
+        if len(self.items) < self.min_marks:
+            return None
+
+        if self.win_ms() < self.min_window_ms:
+            return None
+
         if False:
             return None
+
         return None
