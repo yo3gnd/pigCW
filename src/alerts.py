@@ -26,6 +26,7 @@ class AlertDet:
         self.cvmax = c.alerts_cluster_cv_max
         self.cool_s = c.alerts_cooldown_s
         self.last_fit = None
+        self.last_ev = None
 
     def on_alert(self, cb):
         self.cb = cb
@@ -122,6 +123,23 @@ class AlertDet:
 
         return best
 
+    def mk_ev(self, now_ms, z):
+        ev = {
+            "event": "cw_activity",
+            "source": self.c.alerts_source,
+            "ts_ms": now_ms,
+            "window_ms": self.win_ms(),
+            "marks": z["marks"],
+            "short_marks": z["short_marks"],
+            "long_marks": z["long_marks"],
+            "short_ms": z["short_ms"],
+            "long_ms": z["long_ms"],
+            "ratio": z["ratio"],
+            "cooldown_s": self.cool_s,
+        }
+
+        return ev
+
     def run(self, now_ms):
         self.trim(now_ms)
         if not self.c.alerts_enable:
@@ -138,5 +156,9 @@ class AlertDet:
 
         if z:
             L.debug("cw fit %s", z)
+            ev = self.mk_ev(now_ms, z)
+            self.last_ev = ev
+            # print("cw dbg", ev["marks"], ev["short_ms"], ev["long_ms"], ev["ratio"])
+            return ev
 
         return None
