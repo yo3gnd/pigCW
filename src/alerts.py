@@ -145,6 +145,9 @@ class AlertDet:
         if not self.c.alerts_enable:
             return None
 
+        if now_ms < self.cool_until_ms:
+            return None
+
         if len(self.items) < self.min_marks:
             return None
 
@@ -159,6 +162,12 @@ class AlertDet:
             ev = self.mk_ev(now_ms, z)
             self.last_ev = ev
             # print("cw dbg", ev["marks"], ev["short_ms"], ev["long_ms"], ev["ratio"])
+            self.cool_until_ms = now_ms + (self.cool_s * 1000)
+            self.items = []
+
+            if self.c.alerts_print:
+                print("cw activity", ev["marks"], ev["short_ms"], ev["long_ms"], ev["ratio"])
+
             return ev
 
         return None
