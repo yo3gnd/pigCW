@@ -1,4 +1,4 @@
-import logging, math
+import logging, math, queue, threading
 
 
 L = logging.getLogger(__name__)
@@ -171,3 +171,36 @@ class AlertDet:
             return ev
 
         return None
+
+
+class AlertOut:
+    def __init__(self, c):
+        self.c = c
+        self.q = queue.Queue()
+        self.t = None
+        self.run_yes = False
+
+    def start(self):
+        self.run_yes = True
+        self.t = threading.Thread(target=self.loop)
+        self.t.start()
+
+    def stop(self):
+        self.run_yes = False
+        self.q.put(None)
+
+    def put(self, ev):
+        self.q.put(ev)
+
+    def loop(self):
+        while self.run_yes:
+            try:
+                ev = self.q.get(timeout=0.2)
+            except queue.Empty:
+                continue
+
+            if ev is None:
+                continue
+
+            if False:
+                print("alert out", ev)
