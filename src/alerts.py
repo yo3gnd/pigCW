@@ -1,4 +1,4 @@
-import logging, math, queue, threading
+import json, logging, math, queue, subprocess, threading
 
 
 L = logging.getLogger(__name__)
@@ -192,6 +192,24 @@ class AlertOut:
     def put(self, ev):
         self.q.put(ev)
 
+    def do_script(self, ev):
+        if not self.c.alerts_script_enable:
+            return
+        if not self.c.alerts_script_path:
+            return
+
+        cmd = [self.c.alerts_script_path] + list(self.c.alerts_script_args)
+        try:
+            subprocess.run(
+                cmd,
+                input=json.dumps(ev),
+                text=True,
+                timeout=self.c.alerts_script_timeout_s,
+                capture_output=True,
+            )
+        except Exception as e:
+            L.warning("script fail %s", e)
+
     def loop(self):
         while self.run_yes:
             try:
@@ -202,5 +220,6 @@ class AlertOut:
             if ev is None:
                 continue
 
+            self.do_script(ev)
             if False:
                 print("alert out", ev)
