@@ -179,15 +179,20 @@ class AlertOut:
         self.q = queue.Queue()
         self.t = None
         self.run_yes = False
+        self.mq = None
 
     def start(self):
         self.run_yes = True
+        self.mqtt_start()
         self.t = threading.Thread(target=self.loop)
         self.t.start()
 
     def stop(self):
         self.run_yes = False
         self.q.put(None)
+        if self.mq:
+            self.mq.loop_stop()
+            self.mq.disconnect()
 
     def put(self, ev):
         self.q.put(ev)
@@ -210,6 +215,33 @@ class AlertOut:
         except Exception as e:
             L.warning("script fail %s", e)
 
+    def mqtt_start(self):
+        if not self.c.alerts_mqtt_enable:
+            return
+
+        try:
+            import paho.mqtt.client as mqtt
+        except Exception as e:
+            L.warning("mqtt import %s", e)
+            return
+
+        try:
+            self.mq = mqtt.Client(client_id="pigcw", protocol=mqtt.MQTTv311)
+            self.mq.connect(self.c.alerts_mqtt_host, self.c.alerts_mqtt_port, 30)
+            self.mq.loop_start()
+        except Exception as e:
+            self.mq = None
+            L.warning("mqtt start %s", e)
+
+    def do_mqtt(self, ev):
+        if not self.mq:
+            return
+
+        try:
+            self.mq.publish("pigcw/activity", json.dumps(ev))
+        except Exception as e:
+            L.warning("mqtt send %s", e)
+
     def loop(self):
         while self.run_yes:
             try:
@@ -221,5 +253,6 @@ class AlertOut:
                 continue
 
             self.do_script(ev)
+            self.do_mqtt(ev)
             if False:
                 print("alert out", ev)
