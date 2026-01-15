@@ -226,19 +226,45 @@ class AlertOut:
             return
 
         try:
-            self.mq = mqtt.Client(client_id="pigcw", protocol=mqtt.MQTTv311)
-            self.mq.connect(self.c.alerts_mqtt_host, self.c.alerts_mqtt_port, 30)
+            self.mq = mqtt.Client(
+                client_id=self.c.alerts_mqtt_client_id,
+                protocol=mqtt.MQTTv311,
+            )
+            if self.c.alerts_mqtt_username:
+                self.mq.username_pw_set(
+                    self.c.alerts_mqtt_username,
+                    self.c.alerts_mqtt_password,
+                )
+
+            self.mq.connect(
+                self.c.alerts_mqtt_host,
+                self.c.alerts_mqtt_port,
+                self.c.alerts_mqtt_keepalive_s,
+            )
             self.mq.loop_start()
         except Exception as e:
             self.mq = None
             L.warning("mqtt start %s", e)
+
+    def fmt(self, s, ev):
+        if not s:
+            return json.dumps(ev)
+        try:
+            return s.format(**ev)
+        except Exception:
+            return s
 
     def do_mqtt(self, ev):
         if not self.mq:
             return
 
         try:
-            self.mq.publish("pigcw/activity", json.dumps(ev))
+            self.mq.publish(
+                self.c.alerts_mqtt_topic,
+                self.fmt(self.c.alerts_mqtt_payload, ev),
+                qos=self.c.alerts_mqtt_qos,
+                retain=self.c.alerts_mqtt_retain,
+            )
         except Exception as e:
             L.warning("mqtt send %s", e)
 
