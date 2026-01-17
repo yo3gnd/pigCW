@@ -1,5 +1,7 @@
 import json, logging, math, queue, subprocess, threading
 
+from .utils import mono_clock_ms
+
 
 L = logging.getLogger(__name__)
 
@@ -180,6 +182,9 @@ class AlertOut:
         self.t = None
         self.run_yes = False
         self.mq = None
+        self.mq_ok = False
+        self.mq_next_ms = 0
+        self.mq_wait_s = c.alerts_mqtt_reconnect_min_s
 
     def start(self):
         self.run_yes = True
@@ -230,21 +235,53 @@ class AlertOut:
                 client_id=self.c.alerts_mqtt_client_id,
                 protocol=mqtt.MQTTv311,
             )
+            self.mq.on_connect = self.mqtt_on
+            self.mq.on_disconnect = self.mqtt_off
             if self.c.alerts_mqtt_username:
                 self.mq.username_pw_set(
                     self.c.alerts_mqtt_username,
                     self.c.alerts_mqtt_password,
                 )
 
-            self.mq.connect(
-                self.c.alerts_mqtt_host,
-                self.c.alerts_mqtt_port,
-                self.c.alerts_mqtt_keepalive_s,
-            )
+            self.mq.connect(self.c.alerts_mqtt_host, self.c.alerts_mqtt_port, self.c.alerts_mqtt_keepalive_s)
             self.mq.loop_start()
         except Exception as e:
-            self.mq = None
             L.warning("mqtt start %s", e)
+            self.mq_next_ms = mono_clock_ms() + (self.mq_wait_s * 1000)
+
+    def mqtt_on(self, c, u, f, rc):
+        self.mq_ok = (rc == 0)
+        if self.mq_ok:
+            self.mq_wait_s = self.c.alerts_mqtt_reconnect_min_s
+            self.mq_next_ms = 0
+            L.info("mqtt on")
+        else:
+            L.warning("mqtt on rc %s", rc)
+
+    def mqtt_off(self, c, u, rc):
+        self.mq_ok = False
+        self.mq_next_ms = mono_clock_ms() + (self.mq_wait_s * 1000)
+        L.warning("mqtt off %s", rc)
+
+    def mqtt_tick(self):
+        if not self.mq:
+            return
+        if self.mq_ok:
+            return
+        if not self.mq_next_ms:
+            return
+        if mono_clock_ms() < self.mq_next_ms:
+            return
+
+        try:
+            self.mq.reconnect()
+            L.info("mqtt retry")
+        except Exception as e:
+            L.warning("mqtt retry %s", e)
+            self.mq_next_ms = mono_clock_ms() + (self.mq_wait_s * 1000)
+            self.mq_wait_s = self.mq_wait_s * 2
+            if self.mq_wait_s > self.c.alerts_mqtt_reconnect_max_s:
+                self.mq_wait_s = self.c.alerts_mqtt_reconnect_max_s
 
     def fmt(self, s, ev):
         if not s:
@@ -256,6 +293,9 @@ class AlertOut:
 
     def do_mqtt(self, ev):
         if not self.mq:
+            return
+        if not self.mq_ok:
+            L.warning("mqtt drop")
             return
 
         try:
@@ -270,6 +310,7 @@ class AlertOut:
 
     def loop(self):
         while self.run_yes:
+            self.mqtt_tick()
             try:
                 ev = self.q.get(timeout=0.2)
             except queue.Empty:
