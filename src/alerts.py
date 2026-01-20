@@ -308,6 +308,39 @@ class AlertOut:
         except Exception as e:
             L.warning("mqtt send %s", e)
 
+    def do_http(self, ev):
+        if not self.c.alerts_http_enable:
+            return
+        if self.c.alerts_http_method != "GET":
+            return
+        if not self.c.alerts_http_url:
+            return
+
+        try:
+            import requests
+        except Exception as e:
+            L.warning("http import %s", e)
+            return
+
+        body = self.fmt(self.c.alerts_http_payload, ev)
+        qs = {"payload": body}
+        try:
+            x = json.loads(body)
+            if isinstance(x, dict):
+                qs = x
+        except Exception:
+            pass
+
+        try:
+            requests.get(
+                self.c.alerts_http_url,
+                params=qs,
+                timeout=self.c.alerts_http_timeout_s,
+                verify=self.c.alerts_http_verify_tls,
+            )
+        except Exception as e:
+            L.warning("http get %s", e)
+
     def loop(self):
         while self.run_yes:
             self.mqtt_tick()
@@ -321,5 +354,6 @@ class AlertOut:
 
             self.do_script(ev)
             self.do_mqtt(ev)
+            self.do_http(ev)
             if False:
                 print("alert out", ev)
