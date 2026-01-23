@@ -24,7 +24,7 @@ Vail is bloody good for CW group practice sessions, because it sets up a low-lat
 
 `apt-get install pigpio-tools python3-pigpio python3-numpy libportaudio2 portaudio19-dev python3-pip`
 
-`python3 -m pip install --break-system-packages sounddevice`
+`python3 -m pip install --break-system-packages sounddevice paho-mqtt requests`
 
 You will need pigpiod for this. Once you have it installed, this should return 0
 
@@ -67,3 +67,23 @@ The new alert knobs live in:
 - `[alerts.script]`
 - `[alerts.mqtt]`
 - `[alerts.http]`
+
+Tiny example:
+
+```toml
+[alerts]
+enable = true
+
+[alerts.script]
+enable = true
+path = "/home/pi/bin/cw-alert.sh"
+
+[alerts.mqtt]
+enable = true
+topic = "pigcw/activity"
+
+[alerts.http]
+enable = true
+method = "POST"
+url = "http://127.0.0.1:1880/cw"
+```
