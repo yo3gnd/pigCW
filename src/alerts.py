@@ -11,7 +11,6 @@ class AlertDet:
         self.c = c
         self.items = []
         self.cool_until_ms = 0
-        self.cb = None
 
         self.min_marks = c.alerts_min_marks
         self.min_window_ms = int(c.alerts_min_window_s * 1000)
@@ -29,9 +28,6 @@ class AlertDet:
         self.cool_s = c.alerts_cooldown_s
         self.last_fit = None
         self.last_ev = None
-
-    def on_alert(self, cb):
-        self.cb = cb
 
     def add(self, t_ms, d_ms):
         self.items.append((t_ms, d_ms))
@@ -363,5 +359,3 @@ class AlertOut:
             self.do_script(ev)
             self.do_mqtt(ev)
             self.do_http(ev)
-            if False:
-                print("alert out", ev)
