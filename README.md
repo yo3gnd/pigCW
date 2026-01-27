@@ -17,7 +17,7 @@ Vail suits this sort of thing unusually well because:
 - this matters, because most similar tools, like VBand, are really just pretending to be USB HID keyboards - if you lose focus on the window, it stops working. In other words, you cannot just turn off the monitor and leave it in listen mode
 - it's designed for QRQ modes too and it's actually conversational, well into the 20-24ms per dit sort of territory (this doesn't mean slow keying doesn't work)
 
-Vail is bloody good for CW group practice sessions, because it sets up a low-latency link that still feels conversational while preserving the other operator's fist. If not, you can use [vail zoomer](https://github.com/Vail-CW/vail-zoomer) which injects audio directly into zoom.
+Vail is bloody good for CW group practice sessions, because it sets up a low-latency link that still feels conversational while preserving the other operator's fist. If not everybody uses Vail, you can use [vail zoomer](https://github.com/Vail-CW/vail-zoomer).
 
 
 ## Installation
@@ -63,7 +63,11 @@ Run as `python -m src.vail`.
 
 It reads `pigcw.toml` from the repo root by default.
 
-The new alert knobs live in:
+## Alerts
+
+There is a small CW activity detector in there as well. It does not try to decode anything properly, which is just as well, because there's quite some spam and garbage coming in; and straight keys are not exactly known for discipline. Instead it watches the received mark lengths, waits until they look enough like actual Morse code, and then emits one alert before going quiet again for a while.
+
+When it trips, you will see a line like `cw activity 29 61 184 3.02` on the terminal. That is not meant to be pretty. It is simply the number of marks seen, the fitted short and long mark lengths in milliseconds, and the ratio between them. If you want it to do something more useful than mutter at the console, the knobs live in:
 
 - `[alerts]`
 - `[alerts.script]`

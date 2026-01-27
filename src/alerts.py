@@ -317,20 +317,12 @@ class AlertOut:
             return
 
         body = self.fmt(self.c.alerts_http_payload, ev)
-        qs = {"payload": body}
         hdr = {"Content-Type": self.c.alerts_http_content_type}
-        try:
-            x = json.loads(body)
-            if isinstance(x, dict):
-                qs = x
-        except Exception:
-            pass
 
         try:
             if self.c.alerts_http_method == "GET":
                 requests.get(
                     self.c.alerts_http_url,
-                    params=qs,
                     timeout=self.c.alerts_http_timeout_s,
                     verify=self.c.alerts_http_verify_tls,
                 )

@@ -94,8 +94,8 @@ class AudioToneMix:
             samplerate=self.c.audio_samplerate,
             channels=1,
             dtype="float32",
-            latency=self.c.audio_latency,
-            blocksize=896,
+            latency="low",
+            blocksize=self.c.audio_buffer,
             device=d,
             callback=self.cb,
         )
@@ -106,7 +106,7 @@ class AudioToneMix:
             "audio start %s %s %s %s",
             self.c.audio_device,
             self.c.audio_samplerate,
-            self.c.audio_latency,
+            "low",
             self.stream.latency,
         )
 

@@ -205,8 +205,6 @@ class VailClient:
                 self.wait_before_reconnect()
                 continue
 
-            time.sleep(self.config.thread_sleep_seconds)
-
             try:
                 payload = socket.recv()
             except WebSocketTimeoutException:
