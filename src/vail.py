@@ -7,6 +7,7 @@ from websocket import (
     create_connection,
 )
 
+from .alerts import AlertDet, AlertOut
 from .audio_out import AudioToneMix
 from .cfg import Config
 from .keyer_gpio import KeyerGPIO
@@ -86,8 +87,22 @@ class VailClient:
 
         self.receive_tone_player = ReceiveTonePlayer(config, self.aud)
         self.keyer = KeyerGPIO(config, self.send_transmit_element, self.aud)
+        self.alerts = AlertDet(config)
+        self.alert_out = AlertOut(config)
 
         self.receive_tone_player.start()
+        self.alert_out.start()
+
+    def rx_mark_tap(self, t_ms, xs):
+        for i, x in enumerate(xs):
+            d_ms = int(x)
+            if d_ms < 1:
+                continue
+
+            if i % 2 == 0:
+                self.alerts.add(t_ms, d_ms)
+
+            t_ms += d_ms
 
     def send_transmit_element(self, _element_kind, start_offset_ms, duration_ms):
         packet = {
@@ -170,6 +185,7 @@ class VailClient:
         self.socket_running = False
         self.close_socket()
         self.keyer.stop()
+        self.alert_out.stop()
         self.aud.stop()
 
     def socket_loop(self):
@@ -225,6 +241,10 @@ class VailClient:
 
             receive_start_ms = self.config.rx_delay_ms + int(packet["Timestamp"]) - self.clock_offset_ms
             durations = packet["Duration"]
+            self.rx_mark_tap(receive_start_ms, durations)
+            ev = self.alerts.run(receive_start_ms)
+            if ev:
+                self.alert_out.put(ev)
 
             if not durations:
                 continue
