@@ -1,0 +1,74 @@
+#cloud-config
+
+hostname: pigcw
+manage_etc_hosts: true
+timezone: UTC
+package_update: true
+package_upgrade: false
+enable_ssh: true
+ssh_pwauth: true
+
+users:
+  - name: pigcw
+    gecos: pigCW
+    shell: /bin/bash
+    groups: [audio, sudo]
+    lock_passwd: false
+    passwd: "$6$rounds=4096$XuyKs.O0rV/qUZ4b$UQGwTT/qI42SyKXdN.RZUJ/x7IzScPM3fPhy0V7XzaHLCW1hab5xC6ApaLTF/BZm78pwoBKaF7pXeVho5UxqA."
+
+packages:
+  - git
+  - wget
+  - mpg123
+  - make
+  - gcc
+  - python3
+  - python3-setuptools
+  - python3-pigpio
+  - python3-numpy
+  - python3-websocket
+  - python3-paho-mqtt
+  - python3-requests
+  - libportaudio2
+  - portaudio19-dev
+  - python3-pip
+
+write_files:
+  - path: /etc/systemd/system/pigcw.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=pigCW
+      After=network-online.target sound.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      WorkingDirectory=/srv/pigCW
+      PermissionsStartOnly=true
+      ExecStartPre=/bin/bash -lc 'pgrep pigpiod >/dev/null || /usr/local/bin/pigpiod'
+      ExecStart=/usr/bin/python3 -m src.vail
+      Restart=always
+      RestartSec=2
+      User=pigcw
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - [bash, -lc, "mkdir -p /srv"]
+  - [bash, -lc, "cd /srv && rm -rf pigCW && git clone http://git.local/yo3gnd/pigCW pigCW"]
+  - [bash, -lc, "f=/srv/pigCW/dist/debian-trixie/cloud-init/pigcw1.mp3; [ -f \"$f\" ] && /usr/bin/mpg123 -q -o alsa \"$f\" || true"]
+  - [bash, -lc, "chown -R pigcw:pigcw /srv/pigCW"]
+  - [bash, -lc, "cd /opt && wget -O v79.tar.gz https://github.com/joan2937/pigpio/archive/refs/tags/v79.tar.gz"]
+  - [bash, -lc, "cd /opt && rm -rf pigpio-79 && tar zxf v79.tar.gz"]
+  - [bash, -lc, "f=/srv/pigCW/dist/debian-trixie/cloud-init/pigcw2.mp3; [ -f \"$f\" ] && /usr/bin/mpg123 -q -o alsa \"$f\" || true"]
+  - [bash, -lc, "cd /opt/pigpio-79 && make && make install"]
+  - [bash, -lc, "f=/srv/pigCW/dist/debian-trixie/cloud-init/pigcw3.mp3; [ -f \"$f\" ] && /usr/bin/mpg123 -q -o alsa \"$f\" || true"]
+  - [bash, -lc, "ldconfig"]
+  - [bash, -lc, "python3 -m pip install --break-system-packages sounddevice"]
+  - [bash, -lc, "systemctl daemon-reload"]
+  - [bash, -lc, "systemctl enable pigcw.service"]
+  - [bash, -lc, "systemctl restart pigcw.service"]
+
+final_message: "pigCW first boot setup finished"

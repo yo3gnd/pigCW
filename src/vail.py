@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import json, logging, queue, sys, threading, time
+import json, logging, queue, subprocess, sys, threading, time
+from pathlib import Path
 
 from websocket import (
     WebSocketConnectionClosedException,
@@ -10,11 +11,65 @@ from websocket import (
 from .alerts import AlertDet, AlertOut
 from .audio_out import AudioToneMix
 from .cfg import Config
+from .cw import get_cw_from_ascii
 from .keyer_gpio import KeyerGPIO
 from .utils import mono_clock_ms, wall_clock_ms
 
 
 L = logging.getLogger(__name__)
+
+
+def maybe_first_run_noise():
+    f = Path("first_run_flag")
+    if f.exists():
+        return False
+
+    try:
+        f.touch()
+    except Exception as e:
+        L.warning("first run flag fail %s", e)
+        return False
+
+    mp3 = Path("dist/debian-trixie/cloud-init/pigcw4.mp3")
+    if not mp3.exists():
+        L.warning("first run mp3 missing")
+        return False
+
+    try:
+        subprocess.run(
+            ["/usr/bin/mpg123", "-q", "-o", "alsa", str(mp3)],
+            check=False,
+        )
+        return True
+    except Exception as e:
+        L.warning("first run mp3 fail %s", e)
+        return False
+
+
+def play_startup_cw(out):
+    dit_ms = round(1200 / 25)
+    out.set_frequency(440)
+
+    for ch in "PIG":
+        z = get_cw_from_ascii(ch)
+        n = z.len
+
+        while n > 0:
+            n -= 1
+            if z.data & (1 << n):
+                d_ms = dit_ms * 3
+            else:
+                d_ms = dit_ms
+
+            out.set_enabled(True)
+            time.sleep(d_ms / 1000.0)
+            out.set_enabled(False)
+
+            if n > 0:
+                time.sleep(dit_ms / 1000.0)
+
+        if ch != "G":
+            time.sleep((dit_ms * 3) / 1000.0)
 
 
 class ReceiveTonePlayer:
@@ -273,6 +328,7 @@ def main(config_path=None):
     else:
         config = Config()
 
+    did_first = maybe_first_run_noise()
 
     L.info(
         "cfg %s %s %s %s %s %s %s",
@@ -287,9 +343,10 @@ def main(config_path=None):
 
     client = VailClient(config)
 
-
     try:
         print("Starting...")
+        if not did_first:
+            play_startup_cw(client.aud.tx)
         client.start()
         while True:
             time.sleep(0.1)

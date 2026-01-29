@@ -22,9 +22,9 @@ Vail is bloody good for CW group practice sessions, because it sets up a low-lat
 
 ## Installation
 
-`apt-get install pigpio-tools python3-pigpio python3-numpy libportaudio2 portaudio19-dev python3-pip`
+`apt-get install pigpio-tools python3-pigpio python3-numpy python3-websocket python3-paho-mqtt python3-requests libportaudio2 portaudio19-dev python3-pip`
 
-`python3 -m pip install --break-system-packages sounddevice paho-mqtt requests`
+`python3 -m pip install --break-system-packages sounddevice`
 
 You will need pigpiod for this. Once you have it installed, this should return 0
 
@@ -35,7 +35,7 @@ if it returns `socket connect failed` instead, pigpiod is not running.
 
 Since pigpiod is no longer available under Trixie, run this to build it:
 ```
-sudo apt install -y python3-setuptools python3-full
+sudo apt install -y python3-setuptools python3
 wget https://github.com/joan2937/pigpio/archive/refs/tags/v79.tar.gz
 tar zxf v79.tar.gz
 cd pigpio-79
