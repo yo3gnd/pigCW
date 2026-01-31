@@ -6,6 +6,10 @@ Based on an idea by [YO3AX](https://github.com/YO3AX): "I'm thinking of a batpho
 
 The name pigCW is a bad pun between ham and pigpio - the main IO library - often misread as "pig pio".
 
+<p align="center">
+  <img src="docs/howto.webp" height="480">
+</p>
+
 But why Vail?
 
 Vail suits this sort of thing unusually well because:
@@ -20,11 +24,17 @@ Vail suits this sort of thing unusually well because:
 Vail is bloody good for CW group practice sessions, because it sets up a low-latency link that still feels conversational while preserving the other operator's fist. If not everybody uses Vail, you can use [vail zoomer](https://github.com/Vail-CW/vail-zoomer).
 
 
-## Installation
+## Easy installation
 
-`apt-get install pigpio-tools python3-pigpio python3-numpy python3-websocket python3-paho-mqtt python3-requests libportaudio2 portaudio19-dev python3-pip`
+The easy route is to use Raspberry Pi Imager with the plain Trixie image without a desktop. Once it finishes flashing the card, take the card out, put it back in the reader, and replace the boot partition's `user-data` with [this one](dist/debian-trixie/cloud-init/user-data). Give it Ethernet, or sort out Wi-Fi either in Imager or in the config file before first boot.
 
-`python3 -m pip install --break-system-packages sounddevice`
+While you are there, wire it up. A straight key goes to pin 22, with the nearby ground on pin 20. A paddle goes to pins 36 and 38, with ground on 34. Then boot it. A voice will tell you "Your pigCW installation is starting". The long pause comes after "pigCW installation compiling"; that is the bit building pigpio. When it says "pigCW is now running", it is done and you are on Vail: if someone is already sending, you will hear them, and you can reply from your own key. Later reboots merely greet you with the word PIG in CW.
+
+## Building
+
+`apt-get install pigpio-tools mpg123 libportaudio2 portaudio19-dev python3 python3-pip python3.13-venv`
+
+`python3 -m pip install numpy websocket-client paho-mqtt requests pigpio sounddevice`
 
 You will need pigpiod for this. Once you have it installed, this should return 0
 
@@ -59,7 +69,7 @@ The following pins are used for I/O, and the headphone jack is used for audio.
 
 ## Running 
 
-Run as `python -m src.vail`.
+Run as `python -m src.pigcw`.
 
 It reads `pigcw.toml` from the repo root by default.
 
@@ -82,7 +92,7 @@ enable = true
 
 [alerts.script]
 enable = true
-path = "/home/pi/bin/cw-alert.sh"
+path = "/home/pigcw/bin/cw-alert.sh"
 
 [alerts.mqtt]
 enable = true

@@ -10,6 +10,7 @@ from websocket import (
 
 from .alerts import AlertDet, AlertOut
 from .audio_out import AudioToneMix
+from .boot_wifi import maybe_apply_boot_wifi
 from .cfg import Config
 from .cw import get_cw_from_ascii
 from .keyer_gpio import KeyerGPIO
@@ -322,6 +323,8 @@ class VailClient:
 def main(config_path=None):
     if config_path is None and len(sys.argv) > 1:
         config_path = sys.argv[1]
+
+    maybe_apply_boot_wifi()
 
     if config_path:
         config = Config(config_path)
