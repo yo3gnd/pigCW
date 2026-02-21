@@ -30,6 +30,8 @@ The easy route is to use Raspberry Pi Imager with the plain Trixie image without
 
 While you are there, wire it up. A straight key goes to pin 22, with the nearby ground on pin 20. A paddle goes to pins 36 and 38, with ground on 34. Then boot it. A voice will tell you "Your pigCW installation is starting". The long pause comes after "pigCW installation compiling"; that is the bit building pigpio. When it says "pigCW is now running", it is done and you are on Vail: if someone is already sending, you will hear them, and you can reply from your own key. Later reboots merely greet you with the word PIG in CW.
 
+SSH starts out with the username `pigcw` and the password `pigcw`, which is at least easy to remember.
+
 ## Building
 
 `apt-get install pigpio-tools mpg123 libportaudio2 portaudio19-dev python3 python3-pip python3.13-venv`
