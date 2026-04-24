@@ -1,6 +1,6 @@
 # pigCW
 
-Still experimental. This is a terminal-only client to [Vail](https://vail.woozle.net), for practicing Morse code over the internet.
+Still experimental. This is a terminal-only client to [Vail](https://vail.woozle.org), for practicing Morse code over the internet.
 Connect a straight key or a paddle to the Pi's GPIo and a speaker on its audio output. It becomes a rather direct little Vail terminal - the moment someone sends something on Vail, you will hear it and you can reply directly from your key. It also generates the sidetone on the very same speaker, with care taken for a real-time response.
 Based on an idea by [YO3AX](https://github.com/YO3AX): "I'm thinking of a batphone like device, but for CW, directly connected to Vail. It just beeps at you when someone sends and patiently waits for your reply"
 
@@ -26,7 +26,11 @@ Vail is bloody good for CW group practice sessions, because it sets up a low-lat
 
 ## Easy installation
 
-The easy route is to use Raspberry Pi Imager with the plain Trixie image without a desktop. Once it finishes flashing the card, take the card out, put it back in the reader, and replace the boot partition's `user-data` with [this one](dist/debian-trixie/cloud-init/user-data). Give it Ethernet, or sort out Wi-Fi either in Imager or in the config file before first boot.
+It has been tested on a Raspberry Pi 3B and 3B+. There is now an image available [here](https://github.com/yo3gnd/pigCW/releases/download/20260424-1631/pigcw.img-20260424-1631.img.xz), which you can simply flash to a card and be done with it. Consider it preproduction rather than polished. It currently ships with an SSH host identity baked in; on a normal home LAN this is unlikely to bring about the collapse of civilisation, but the security-minded may still wish to regenerate it.
+
+If you need Wi-Fi, mount the boot partition after flashing, copy `pigcw-wifi.example.toml` to `pigcw-wifi.toml`, and edit the SSID and password. It needs internet access not just for Vail, but also for the current time and updates. The current time matters rather more than it should: if the clock runs slow, your breaks get longer and everyone else has a worse time of it; if it runs fast enough, you end up trying to receive CW from the past, which naturally does not work.
+
+If you would rather build your own image with cloud-init, that is still possible. Use Raspberry Pi Imager with the plain Trixie image without a desktop, then replace the boot partition's `user-data` with [this one](dist/debian-trixie/cloud-init/user-data) before first boot. That route is more fiddly, but it does let you see exactly what is being done.
 
 While you are there, wire it up. A straight key goes to pin 22, with the nearby ground on pin 20. A paddle goes to pins 36 and 38, with ground on 34. Then boot it. A voice will tell you "Your pigCW installation is starting". The long pause comes after "pigCW installation compiling"; that is the bit building pigpio. When it says "pigCW is now running", it is done and you are on Vail: if someone is already sending, you will hear them, and you can reply from your own key. Later reboots merely greet you with the word PIG in CW.
 
