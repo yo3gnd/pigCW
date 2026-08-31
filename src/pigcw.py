@@ -288,8 +288,15 @@ class VailClient:
                 continue
 
             if first_packet is None:
+                try:
+                    timestamp_ms = int(packet["Timestamp"])
+                except (KeyError, TypeError, ValueError) as error:
+                    L.warning("ws initial timestamp invalid (%s)", type(error).__name__)
+                    self.close_socket()
+                    self.wait_before_reconnect()
+                    continue
+
                 first_packet = packet
-                timestamp_ms = int(packet["Timestamp"])
                 self.clock_offset_ms = wall_clock_ms() - timestamp_ms
                 continue
 
